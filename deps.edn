@@ -1,0 +1,26 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        org.clojure/data.json {:mvn/version "2.5.0"}
+        org.clojure/tools.namespace {:mvn/version "1.5.0"}
+
+        ; Logging
+        com.taoensso/timbre {:mvn/version "6.6.1"}
+
+        ; Reveal for REPL debugging
+        vlaaad/reveal {:mvn/version "1.3.280"}}
+
+ :aliases
+ {:dev {:extra-paths ["dev" "test"]
+        :extra-deps {}}
+
+  :nrepl {:extra-paths ["test"]
+          :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
+          ;; this allows nrepl to interrupt runaway repl evals
+          :jvm-opts ["-Djdk.attach.allowAttachSelf"]
+          :main-opts ["-m" "nrepl.cmdline"]}
+
+  :mcp {:extra-deps {io.github.clojure-mcp/clojure-mcp-server
+                     {:git/url "https://github.com/clojure-mcp/clojure-mcp-server.git"
+                      :git/sha "1fde88b5e7b3c3c3a3e0f6c1e7f4b3e3d3c3b3a3"}}
+        :exec-fn clojure-mcp.core/start
+        :exec-args {:host "localhost"}}}}

@@ -1,0 +1,1 @@
+/Users/genekim/src.local/slack-retriever/src/slack_archive/util/closed_record.clj
