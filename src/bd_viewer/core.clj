@@ -3,6 +3,7 @@
   (:require [bd-viewer.db :as db]
             [bd-viewer.ui :as ui]
             [bd-viewer.effects.swing :as fx]
+            [bd-viewer.keyboard :as kbd]
             [taoensso.timbre :as log]
             [clojure.java.io :as io]
             [clojure.pprint :as pp])
@@ -28,21 +29,28 @@
   (db/init-state!)
 
   ;; 2. Create and show UI
-  (ui/create-main-frame)
+  (let [frame (ui/create-main-frame)]
 
-  ;; 3. Setup reactive watchers (after UI exists!)
-  (fx/setup-watchers!)
+    ;; 3. Setup reactive watchers (after UI exists!)
+    (fx/setup-watchers!)
 
-  ;; 4. Add state dump watcher for debugging
-  (add-watch db/*app-state ::dump-state
-    (fn [_ _ old-state new-state]
-      (dump-state-to-file!)))
+    ;; 4. Setup keyboard shortcuts (after UI exists!)
+    (kbd/setup-keyboard-shortcuts! frame)
 
-  ;; 5. Trigger initial UI population
-  ;; Watchers only fire on changes, so we do initial update manually
-  (let [state @db/*app-state]
-    (fx/update-issue-list! {} state)
-    (fx/update-detail-panel! {} state)
-    (dump-state-to-file!))  ; Initial dump
+    ;; 5. Add state dump watcher for debugging
+    (add-watch db/*app-state ::dump-state
+      (fn [_ _ old-state new-state]
+        (dump-state-to-file!)))
+
+    ;; 6. Trigger initial UI population
+    ;; Watchers only fire on changes, so we do initial update manually
+    (let [state @db/*app-state]
+      (fx/update-issue-list! {} state)
+      (fx/update-detail-panel! {} state)
+      (dump-state-to-file!))  ; Initial dump
+
+    ;; 7. Select first issue if there are any issues
+    (when (seq (:issues @db/*app-state))
+      (db/select-issue-by-index 0)))
 
   (log/info :bd-viewer/started))

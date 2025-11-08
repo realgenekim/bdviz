@@ -197,5 +197,11 @@
     ;; Show it!
     (.setVisible frame true)
 
+    ;; Set initial focus to the issue list (not search bar)
+    ;; This allows j/k navigation to work immediately!
+    (SwingUtilities/invokeLater
+      (fn []
+        (.requestFocusInWindow issue-list)))
+
     (log/info :create-main-frame :success true)
     frame))
