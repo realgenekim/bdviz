@@ -38,6 +38,7 @@
          :selected-index -1      ; Index in filtered list for j/k navigation
          :filter-text ""         ; Search filter text
          :sort-by :priority      ; Sort criterion
+         :show-open-only true    ; Toggle: show only open issues (o key)
          :ui-refs {}}))          ; References to Swing widgets
 
 ;; ============================================================================
@@ -138,9 +139,16 @@
   (let [state @*app-state
         issues (:issues state)
         filter-text (:filter-text state)
-        sort-by (:sort-by state)]
+        sort-by (:sort-by state)
+        show-open-only (:show-open-only state)]
     (-> issues
+        ;; First filter by open status if needed
+        (#(if show-open-only
+            (filterv (fn [issue] (= "open" (:status issue))) %)
+            %))
+        ;; Then apply text filter
         (filter-issues filter-text)
+        ;; Finally sort
         (sort-issues sort-by))))
 
 ;; ============================================================================
