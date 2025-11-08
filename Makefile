@@ -1,5 +1,5 @@
 run:
-	clj -J-Xdock:icon=icons/icon.png -J-Xdock:name="BD Viewer" -M -m bd-viewer.core
+	clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core
 
 runtests-once:
 	@echo "Checking compilation..."
@@ -11,15 +11,17 @@ nrepl:
 
 # Configure MCP server in Claude Code
 mcp-configure:
-	claude mcp add clojure-mcp -- /bin/sh -c 'PORT=$$(cat /Users/genekim/src.local/bd-viewer/.nrepl-port); cd /Users/genekim/src.local/bd-viewer && clojure -X:mcp :port $$PORT'
+	claude mcp add clojure-mcp -- /bin/sh -c 'PORT=$$(cat $(shell pwd)/.nrepl-port); cd $(shell pwd) && clojure -X:mcp:dev :port $$PORT'
 
 # Run MCP server (for testing)
-run-mcp:
-	PORT=$$(cat /Users/genekim/src.local/bd-viewer/.nrepl-port); cd /Users/genekim/src.local/bd-viewer && clojure -X:mcp :port $$PORT
+mcp-run:
+	@echo "🚀 Starting Clojure MCP server..."
+	@echo "   Reading port from: $(shell pwd)/.nrepl-port"
+	PORT=$$(cat $(shell pwd)/.nrepl-port); cd $(shell pwd) && clojure -X:mcp:dev :port $$PORT
 
 # Clean compiled artifacts
 clean:
-	rm -rf .cpcache/ .nrepl-port target/
+	rm -rf .cpcache/ .nrepl-port
 
 # Help
 help:
@@ -28,8 +30,8 @@ help:
 	@echo "  make runtests-once - Check compilation"
 	@echo "  make nrepl         - Start nREPL server (auto-port, writes to .nrepl-port)"
 	@echo "  make mcp-configure - Configure MCP server in Claude Code"
-	@echo "  make run-mcp       - Run MCP server (reads port from .nrepl-port)"
+	@echo "  make mcp-run       - Run MCP server (reads port from .nrepl-port)"
 	@echo "  make clean         - Clean compiled artifacts"
 	@echo "  make help          - Show this help"
 
-.PHONY: run runtests-once nrepl mcp-configure run-mcp clean help
+.PHONY: run runtests-once nrepl mcp-configure mcp-run clean help

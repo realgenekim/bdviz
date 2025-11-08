@@ -17,10 +17,4 @@
           :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
           ;; this allows nrepl to interrupt runaway repl evals
           :jvm-opts ["-Djdk.attach.allowAttachSelf"]
-          :main-opts ["-m" "nrepl.cmdline"]}
-
-  :mcp {:extra-deps {io.github.clojure-mcp/clojure-mcp-server
-                     {:git/url "https://github.com/clojure-mcp/clojure-mcp-server.git"
-                      :git/sha "1fde88b5e7b3c3c3a3e0f6c1e7f4b3e3d3c3b3a3"}}
-        :exec-fn clojure-mcp.core/start
-        :exec-args {:host "localhost"}}}}
+          :main-opts ["-m" "nrepl.cmdline"]}}}
