@@ -18,17 +18,38 @@
   (or (System/getenv "BD_VIEWER_DIR") "."))
 
 (defn get-target-db
-  "Find the .db file in the target directory's .beads/ folder.
-  Returns the absolute path to the database file, or nil if not found."
+  "Find or construct the database path for the target directory.
+  
+  Strategy:
+  1. Look for a .db file that matches the directory name (e.g., slack-retriever.db)
+  2. If not found, look for any .db file in .beads/
+  3. If still not found, construct the path based on directory name
+  
+  This prevents bd from using auto-discovery which can find the wrong database."
   []
   (let [target-dir (get-target-dir)
-        beads-dir (clojure.java.io/file target-dir ".beads")]
-    (when (.exists beads-dir)
+        ;; Get the directory basename (e.g., 'slack-retriever' from '../slack-retriever')
+        dir-name (.getName (clojure.java.io/file target-dir))
+        beads-dir (clojure.java.io/file target-dir ".beads")
+        expected-db-name (str dir-name ".db")]
+
+    (if (.exists beads-dir)
+      ;; .beads directory exists - look for database
       (let [db-files (->> (.listFiles beads-dir)
                           (filter #(.endsWith (.getName %) ".db"))
-                          (sort-by #(.getName %)))]
-        (when (seq db-files)
-          (.getAbsolutePath (first db-files)))))))
+                          vec)
+            ;; Try to find database matching directory name
+            matching-db (first (filter #(= (.getName %) expected-db-name) db-files))]
+        (if matching-db
+          ;; Found matching database
+          (.getAbsolutePath matching-db)
+          ;; No matching database - use first .db file or construct path
+          (if (seq db-files)
+            (.getAbsolutePath (first db-files))
+            ;; No database exists - return expected path for bd to create
+            (.getAbsolutePath (clojure.java.io/file beads-dir expected-db-name)))))
+      ;; .beads directory doesn't exist - return expected path
+      (.getAbsolutePath (clojure.java.io/file beads-dir expected-db-name)))))
 
 ;; ============================================================================
 ;; Core API
@@ -82,7 +103,11 @@
   (log/info :beads.shell/show-issue :issue-id issue-id)
   (try
     (let [target-dir (get-target-dir)
-          result (shell/sh "bd" "show" issue-id "--json" :dir target-dir)
+          target-db (get-target-db)
+          args (cond-> ["bd"]
+                 target-db (concat ["--db" target-db])
+                 :always (concat ["show" issue-id "--json"]))
+          result (apply shell/sh (concat args [:dir target-dir]))
           exit-code (:exit result)]
       (if (zero? exit-code)
         (let [parsed (json/read-str (:out result) :key-fn keyword)]
@@ -115,15 +140,18 @@
   (log/info :beads.shell/create-issue! :opts opts)
   (try
     (let [target-dir (get-target-dir)
+          target-db (get-target-db)
           ;; Build command args from opts
-          args (concat ["bd" "create"]
-                       (when (:title opts) ["--title" (:title opts)])
-                       (when (:description opts) ["--description" (:description opts)])
-                       (when (:status opts) ["--status" (:status opts)])
-                       (when (:priority opts) ["--priority" (str (:priority opts))])
-                       (when (:issue-type opts) ["--type" (:issue-type opts)])
-                       (when (:assignee opts) ["--assignee" (:assignee opts)])
-                       ["--json"])
+          args (cond-> ["bd"]
+                 target-db (concat ["--db" target-db])
+                 :always (concat ["create"])
+                 (:title opts) (concat ["--title" (:title opts)])
+                 (:description opts) (concat ["--description" (:description opts)])
+                 (:status opts) (concat ["--status" (:status opts)])
+                 (:priority opts) (concat ["--priority" (str (:priority opts))])
+                 (:issue-type opts) (concat ["--type" (:issue-type opts)])
+                 (:assignee opts) (concat ["--assignee" (:assignee opts)])
+                 :always (concat ["--json"]))
           result (apply shell/sh (concat args [:dir target-dir]))
           exit-code (:exit result)]
       (if (zero? exit-code)
@@ -157,14 +185,17 @@
   (log/info :beads.shell/update-issue! :issue-id issue-id :opts opts)
   (try
     (let [target-dir (get-target-dir)
-          args (concat ["bd" "update" issue-id]
-                       (when (:title opts) ["--title" (:title opts)])
-                       (when (:description opts) ["--description" (:description opts)])
-                       (when (:status opts) ["--status" (:status opts)])
-                       (when (:priority opts) ["--priority" (str (:priority opts))])
-                       (when (:issue-type opts) ["--type" (:issue-type opts)])
-                       (when (:assignee opts) ["--assignee" (:assignee opts)])
-                       ["--json"])
+          target-db (get-target-db)
+          args (cond-> ["bd"]
+                 target-db (concat ["--db" target-db])
+                 :always (concat ["update" issue-id])
+                 (:title opts) (concat ["--title" (:title opts)])
+                 (:description opts) (concat ["--description" (:description opts)])
+                 (:status opts) (concat ["--status" (:status opts)])
+                 (:priority opts) (concat ["--priority" (str (:priority opts))])
+                 (:issue-type opts) (concat ["--type" (:issue-type opts)])
+                 (:assignee opts) (concat ["--assignee" (:assignee opts)])
+                 :always (concat ["--json"]))
           result (apply shell/sh (concat args [:dir target-dir]))
           exit-code (:exit result)]
       (if (zero? exit-code)
@@ -190,7 +221,11 @@
   (log/info :beads.shell/delete-issue! :issue-id issue-id)
   (try
     (let [target-dir (get-target-dir)
-          result (shell/sh "bd" "delete" issue-id :dir target-dir)
+          target-db (get-target-db)
+          args (cond-> ["bd"]
+                 target-db (concat ["--db" target-db])
+                 :always (concat ["delete" issue-id]))
+          result (apply shell/sh (concat args [:dir target-dir]))
           exit-code (:exit result)]
       (if (zero? exit-code)
         (do

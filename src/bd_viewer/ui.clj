@@ -96,6 +96,7 @@
   Tab 1: Issues list (original UI)
   Tab 2: Dependency graph visualization"
   (s/tabbed-panel
+   :id :content ; ID for easy selection when rebuilding graph tab
    :placement :top
    :tabs [{:title "📋 Issues"
            :tip "List view of all issues"
@@ -238,6 +239,21 @@
                        :selected-index current-index))))
 
            (log/info :rebuild-ui! :success true)))))))
+
+(defn rebuild-graph-tab!
+  "Rebuild the graph tab with fresh data.
+  
+  Called when Cmd+R is pressed to reload dependencies and re-render the graph."
+  []
+  (when-let [frame @*frame]
+    (sf/invoke-later
+     (fn []
+       (log/info :rebuild-graph-tab! :start true)
+       (let [tabs (s/select frame [:#content])
+             new-graph-panel (graph-tab/create-graph-panel)]
+         ;; Replace graph tab (index 1)
+         (.setComponentAt tabs 1 new-graph-panel)
+         (log/info :rebuild-graph-tab! :success true))))))
 
 ;; ============================================================================
 ;; Main Frame Creation

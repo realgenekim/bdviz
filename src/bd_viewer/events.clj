@@ -105,6 +105,11 @@
         (swap! db/*app-state assoc
                :selected-issue nil
                :selected-index -1))
+
+      ;; NEW: Rebuild graph tab with fresh dependencies
+      (require 'bd-viewer.ui)
+      ((resolve 'bd-viewer.ui/rebuild-graph-tab!))
+
       (log/info ::reload-issues
                 :success true
                 :count (count issues)))
