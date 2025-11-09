@@ -27,24 +27,27 @@
      ;; Top: Search bar and toolbar
    :north (s/border-panel
            :border [5 5 5 5]
-           :west (s/label " Search: ")
+           :west (s/label :text " Search: " :font (Font. Font/SANS_SERIF Font/PLAIN 16))
            :center (s/text :id :search-field
                            :columns 30
-                           :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                           :font (Font. Font/SANS_SERIF Font/PLAIN 16))
            :east (s/horizontal-panel
                   :items [(s/button :id :reload-code-btn
-                                    :text "Reload Code (⌘⇧R)")
+                                    :text "Reload Code (⌘⇧R)"
+                                    :font (Font. Font/SANS_SERIF Font/PLAIN 14))
                           (s/button :id :reload-btn
-                                    :text "Reload (⌘R)")
+                                    :text "Reload (⌘R)"
+                                    :font (Font. Font/SANS_SERIF Font/PLAIN 14))
                           (s/button :id :delete-btn
-                                    :text "Delete (⌘D)")]))
+                                    :text "Delete (⌘D)"
+                                    :font (Font. Font/SANS_SERIF Font/PLAIN 14))]))
 
      ;; Center: Split pane with issue list and detail panel
    :center (s/left-right-split
-               ;; Left: Issue list
+               ;; Left: Issue list - bigger monospaced font
             (s/scrollable
              (s/listbox :id :issue-list
-                        :font (Font. Font/MONOSPACED Font/PLAIN 12)
+                        :font (Font. Font/MONOSPACED Font/PLAIN 14)
                         :selection-mode :single)
              :preferred-size [400 :by 600])
 
@@ -53,12 +56,12 @@
              :id :detail-panel
              :border [10 10 10 10]
 
-                 ;; Title at top
+                 ;; Title at top - bigger and bold
              :north (s/label :id :title-label
                              :text "No issue selected"
-                             :font (Font. Font/SANS_SERIF Font/BOLD 16))
+                             :font (Font. Font/SANS_SERIF Font/BOLD 20))
 
-                 ;; Description in center
+                 ;; Description in center - bigger font
              :center (s/scrollable
                       (s/text :id :description-area
                               :multi-line? true
@@ -66,19 +69,19 @@
                               :rows 10
                               :columns 40
                               :wrap-lines? true
-                              :font (Font. Font/SANS_SERIF Font/PLAIN 12)))
+                              :font (Font. Font/SANS_SERIF Font/PLAIN 14)))
 
-                 ;; Metadata at bottom
+                 ;; Metadata at bottom - bigger font
              :south (s/vertical-panel
                      :id :metadata-panel
                      :border [10 10 10 10]
-                     :items [(s/label :id :id-label :text "")
-                             (s/label :id :status-label :text "")
-                             (s/label :id :priority-label :text "")
-                             (s/label :id :type-label :text "")
-                             (s/label :id :labels-label :text "")
-                             (s/label :id :created-label :text "")
-                             (s/label :id :updated-label :text "")]))
+                     :items [(s/label :id :id-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                             (s/label :id :status-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                             (s/label :id :priority-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                             (s/label :id :type-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                             (s/label :id :labels-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                             (s/label :id :created-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                             (s/label :id :updated-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))]))
 
             :divider-location 400
             :resize-weight 0.4)))
