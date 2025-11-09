@@ -4,7 +4,7 @@
             [swing-fx.core :as sf]
             [bd-viewer.db :as db]
             [bd-viewer.events :as events]
-            [bd-viewer.ui.graph-tab :as graph-tab]
+            [bd-viewer.ui.graph-tab2 :as graph-tab] ; Using Mermaid instead of GraphStream!
             [taoensso.timbre :as log])
   (:import [java.awt Font Dimension]))
 

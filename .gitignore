@@ -4,3 +4,4 @@ state.edn
 .lsp
 .clojure-mcp
 classes
+.calva

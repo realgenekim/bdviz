@@ -1,4 +1,4 @@
-(ns bd-viewer.ui.graph-tab
+(ns bd-viewer.ui.graph-tab2
   "Graph visualization tab for bd-viewer - shows dependency graph using Mermaid.
 
   Replaced GraphStream with Mermaid.ink rendering for clean, overlap-free diagrams!"
@@ -26,11 +26,11 @@
             (.add label BorderLayout/CENTER)))
         ;; Error case - show message
         (s/label :text "Error: Could not fetch diagram from mermaid.ink"
-                :font (Font. Font/SANS_SERIF Font/BOLD 16))))
+                 :font (Font. Font/SANS_SERIF Font/BOLD 16))))
     (catch Exception e
       (log/error :create-diagram-panel :exception (.getMessage e))
       (s/label :text (str "Error: " (.getMessage e))
-              :font (Font. Font/SANS_SERIF Font/BOLD 16)))))
+               :font (Font. Font/SANS_SERIF Font/BOLD 16)))))
 
 (defn create-graph-panel
   "Create the graph visualization panel using Mermaid.
@@ -39,22 +39,22 @@
   []
   (let [issues (:issues @db/*app-state)
         deps (beads-db/get-dependencies)
-        
+
         ;; Filter to non-closed issues
         open-issues (filter #(not= "closed" (:status %)) issues)
-        
+
         label-text (str "Dependency Graph (" (count open-issues) " open issues)")
         diagram-panel (create-diagram-panel issues deps)
-        
+
         panel (s/border-panel
                :north (s/label
                        :text label-text
                        :font (Font. Font/SANS_SERIF Font/BOLD 16)
                        :border 5)
                :center diagram-panel)]
-    
+
     (log/info :create-graph-panel :success true
               :total-issues (count issues)
               :open-issues (count open-issues))
-    
+
     panel))

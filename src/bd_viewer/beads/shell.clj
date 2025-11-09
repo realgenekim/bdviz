@@ -17,6 +17,19 @@
   []
   (or (System/getenv "BD_VIEWER_DIR") "."))
 
+(defn get-target-db
+  "Find the .db file in the target directory's .beads/ folder.
+  Returns the absolute path to the database file, or nil if not found."
+  []
+  (let [target-dir (get-target-dir)
+        beads-dir (clojure.java.io/file target-dir ".beads")]
+    (when (.exists beads-dir)
+      (let [db-files (->> (.listFiles beads-dir)
+                          (filter #(.endsWith (.getName %) ".db"))
+                          (sort-by #(.getName %)))]
+        (when (seq db-files)
+          (.getAbsolutePath (first db-files)))))))
+
 ;; ============================================================================
 ;; Core API
 ;; ============================================================================
@@ -32,9 +45,13 @@
   (log/info :beads.shell/list-issues :start true)
   (try
     (let [target-dir (get-target-dir)
-          result (shell/sh "bd" "list" "--json" :dir target-dir)
+          target-db (get-target-db)
+          args (cond-> ["bd"]
+                 target-db (concat ["--db" target-db])
+                 :always (concat ["list" "--json"]))
+          result (apply shell/sh (concat args [:dir target-dir]))
           exit-code (:exit result)]
-      (log/info :beads.shell/list-issues :target-dir target-dir)
+      (log/info :beads.shell/list-issues :target-dir target-dir :target-db target-db)
       (if (zero? exit-code)
         (let [raw-output (:out result)
               ;; Handle both array response and null (empty)
