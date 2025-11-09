@@ -5,7 +5,7 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.data.json :as json]
             [clojure.java.shell :as shell]
-            [bd-viewer.util.closed-record :refer [closed-record]]
+            [closed-record.core :refer [closed-record]]
             [taoensso.timbre :as log]))
 
 ;; ============================================================================
@@ -16,11 +16,11 @@
 (s/def ::title string?)
 (s/def ::description (s/nilable string?))
 (s/def ::status #{"open" "closed" "in-progress"})
-(s/def ::priority (s/int-in 0 5))  ; P0-P4
+(s/def ::priority (s/int-in 0 5)) ; P0-P4
 (s/def ::issue-type #{"bug" "feature" "task" "epic" "chore"})
 (s/def ::labels (s/coll-of string?))
-(s/def ::created-at string?)  ; ISO timestamp
-(s/def ::updated-at string?)  ; ISO timestamp
+(s/def ::created-at string?) ; ISO timestamp
+(s/def ::updated-at string?) ; ISO timestamp
 (s/def ::assignee (s/nilable string?))
 (s/def ::closed-at (s/nilable string?))
 
@@ -33,13 +33,13 @@
 ;; ============================================================================
 
 (defonce *app-state
-  (atom {:issues []              ; Vector of ClosedRecord issues
-         :selected-issue nil     ; Currently selected issue ID (string)
-         :selected-index -1      ; Index in filtered list for j/k navigation
-         :filter-text ""         ; Search filter text
-         :sort-by :priority      ; Sort criterion
-         :show-open-only true    ; Toggle: show only open issues (o key)
-         :ui-refs {}}))          ; References to Swing widgets
+  (atom {:issues [] ; Vector of ClosedRecord issues
+         :selected-issue nil ; Currently selected issue ID (string)
+         :selected-index -1 ; Index in filtered list for j/k navigation
+         :filter-text "" ; Search filter text
+         :sort-by :priority ; Sort criterion
+         :show-open-only true ; Toggle: show only open issues (o key)
+         :ui-refs {}})) ; References to Swing widgets
 
 ;; ============================================================================
 ;; Loading Issues from BD CLI
@@ -62,7 +62,7 @@
               ;; Wrap each issue in ClosedRecord for type safety
               issues (mapv #(closed-record % {:spec ::issue
                                               :relax-constructor-constraints? true})
-                          parsed)]
+                           parsed)]
           (log/info :load-issues-from-bd
                     :success true
                     :count (count issues))
@@ -73,8 +73,8 @@
                      :exit-code exit-code
                      :stderr (:err result))
           (throw (ex-info "Failed to load issues from bd CLI"
-                         {:exit-code exit-code
-                          :stderr (:err result)})))))
+                          {:exit-code exit-code
+                           :stderr (:err result)})))))
     (catch Exception e
       (log/error :load-issues-from-bd
                  :exception (.getMessage e))
@@ -120,7 +120,7 @@
                        (clojure.string/includes?
                         (clojure.string/lower-case desc)
                         lower-filter))))
-              issues))))
+               issues))))
 
 (defn sort-issues
   "Sort issues by the given criterion.
@@ -129,9 +129,9 @@
   (case sort-by
     :priority (sort-by :priority issues)
     :created-at (sort-by :created-at issues)
-    :updated-at (sort-by :updated-at #(compare %2 %1) issues)  ; Reverse: newest first
+    :updated-at (sort-by :updated-at #(compare %2 %1) issues) ; Reverse: newest first
     :status (sort-by :status issues)
-    issues))  ; Default: no sorting
+    issues)) ; Default: no sorting
 
 (defn get-filtered-issues
   "Get filtered and sorted issues from current state."
@@ -219,7 +219,7 @@
   (-> @*app-state :issues first :title)
 
   ;; Test ClosedRecord - this should THROW:
-  (-> @*app-state :issues first :titel)  ; Typo!
+  (-> @*app-state :issues first :titel) ; Typo!
 
   ;; Test filtering
   (swap! *app-state assoc :filter-text "UI")
@@ -229,5 +229,4 @@
   (select-issue-by-index 0)
   (select-next-issue)
   (select-prev-issue)
-  (get-selected-issue)
-  )
+  (get-selected-issue))

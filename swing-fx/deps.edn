@@ -1,0 +1,11 @@
+{:paths ["src"]
+
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        closed-record/closed-record {:local/root "../../closed-record"}
+        seesaw/seesaw {:mvn/version "1.5.0"}}
+
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}}}
+
+  :dev {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}}}}}

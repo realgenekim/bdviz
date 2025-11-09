@@ -1,207 +1,161 @@
 (ns bd-viewer.ui
   "Swing UI components for bd-viewer."
-  (:require [bd-viewer.db :as db]
+  (:require [seesaw.core :as s]
+            [bd-viewer.db :as db]
             [bd-viewer.events :as events]
             [taoensso.timbre :as log])
-  (:import [javax.swing JFrame JList JPanel JTextField JButton JLabel JTextArea
-                        JScrollPane JSplitPane DefaultListModel BorderFactory
-                        ListSelectionModel SwingUtilities]
-           [javax.swing.event ListSelectionListener DocumentListener]
-           [java.awt BorderLayout GridLayout FlowLayout Font Color Dimension]
-           [java.awt.event ActionListener]))
+  (:import [java.awt Font Dimension]))
 
 ;; ============================================================================
-;; Issue List (Left Panel)
+;; UI Creation with Seesaw
 ;; ============================================================================
 
-(defn create-issue-list []
-  "Create the left-side JList showing all issues."
-  (let [model (DefaultListModel.)
-        jlist (doto (JList. model)
-                (.setSelectionMode ListSelectionModel/SINGLE_SELECTION)
-                (.setFont (Font. Font/MONOSPACED Font/PLAIN 12)))]
-    ;; Wire up selection events
-    (.addListSelectionListener jlist
-      (reify ListSelectionListener
-        (valueChanged [_ e]
-          (when-not (.getValueIsAdjusting e)
-            (let [index (.getSelectedIndex jlist)]
-              (when (>= index 0)
-                (let [filtered (db/get-filtered-issues)
+(defn create-ui []
+  "Create the main UI using Seesaw's declarative API."
+  (s/frame
+   :title "BD Viewer"
+   :size [1000 :by 700]
+   :on-close :exit
+   :content
+   (s/border-panel
+    :border 5
+
+      ;; Top: Search bar and toolbar
+    :north (s/border-panel
+            :border [5 5 5 5]
+            :west (s/label " Search: ")
+            :center (s/text :id :search-field
+                            :columns 30
+                            :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+            :east (s/horizontal-panel
+                   :items [(s/button :id :reload-btn
+                                     :text "Reload (⌘R)")
+                           (s/button :id :delete-btn
+                                     :text "Delete (⌘D)")]))
+
+      ;; Center: Split pane with issue list and detail panel
+    :center (s/left-right-split
+                ;; Left: Issue list
+             (s/scrollable
+              (s/listbox :id :issue-list
+                         :font (Font. Font/MONOSPACED Font/PLAIN 12)
+                         :selection-mode :single)
+              :preferred-size [400 :by 600])
+
+                ;; Right: Detail panel
+             (s/border-panel
+              :id :detail-panel
+              :border [10 10 10 10]
+
+                  ;; Title at top
+              :north (s/label :id :title-label
+                              :text "No issue selected"
+                              :font (Font. Font/SANS_SERIF Font/BOLD 16))
+
+                  ;; Description in center
+              :center (s/scrollable
+                       (s/text :id :description-area
+                               :multi-line? true
+                               :editable? false
+                               :rows 10
+                               :columns 40
+                               :wrap-lines? true
+                               :font (Font. Font/SANS_SERIF Font/PLAIN 12)))
+
+                  ;; Metadata at bottom
+              :south (s/vertical-panel
+                      :id :metadata-panel
+                      :border [10 10 10 10]
+                      :items [(s/label :id :id-label :text "")
+                              (s/label :id :status-label :text "")
+                              (s/label :id :priority-label :text "")
+                              (s/label :id :type-label :text "")
+                              (s/label :id :labels-label :text "")
+                              (s/label :id :created-label :text "")
+                              (s/label :id :updated-label :text "")]))
+
+             :divider-location 400
+             :resize-weight 0.4))))
+
+;; ============================================================================
+;; Event Wiring
+;; ============================================================================
+
+(defn wire-events! [frame]
+  "Wire up event handlers using Seesaw's listen."
+
+  ;; Search field - listen to document changes
+  (s/listen (s/select frame [:#search-field]) :document
+            (fn [e]
+              (events/handle-event
+               {:event/type ::events/filter-changed
+                :text (s/text (s/select frame [:#search-field]))})))
+
+  ;; Issue list - listen to selection changes
+  (s/listen (s/select frame [:#issue-list]) :selection
+            (fn [e]
+              (when-let [selected (s/selection e)]
+                (let [index (.getSelectedIndex (s/to-widget e))
+                      filtered (db/get-filtered-issues)
                       issue (nth filtered index nil)]
                   (when issue
                     (events/handle-event
-                      {:event/type ::events/issue-selected
-                       :issue-id (:id issue)
-                       :index index})))))))))
-    ;; Store reference in state
-    (swap! db/*app-state assoc-in [:ui-refs :issue-list] jlist)
-    jlist))
+                     {:event/type ::events/issue-selected
+                      :issue-id (:id issue)
+                      :index index}))))))
+
+  ;; Reload button
+  (s/listen (s/select frame [:#reload-btn]) :action
+            (fn [_]
+              (events/handle-event {:event/type ::events/reload-issues})))
+
+  ;; Delete button
+  (s/listen (s/select frame [:#delete-btn]) :action
+            (fn [_]
+              (events/handle-event {:event/type ::events/delete-issue}))))
 
 ;; ============================================================================
-;; Detail Panel (Right Side)
+;; UI Reference Storage
 ;; ============================================================================
 
-(defn create-detail-panel []
-  "Create the right-side detail view."
-  (let [;; Title
-        title-label (doto (JLabel. "No issue selected")
-                      (.setFont (Font. Font/SANS_SERIF Font/BOLD 16)))
-
-        ;; Description
-        desc-area (doto (JTextArea. 10 40)
-                    (.setEditable false)
-                    (.setLineWrap true)
-                    (.setWrapStyleWord true)
-                    (.setFont (Font. Font/SANS_SERIF Font/PLAIN 12)))
-        desc-scroll (JScrollPane. desc-area)
-
-        ;; Metadata labels
-        id-label (JLabel. "")
-        status-label (JLabel. "")
-        priority-label (JLabel. "")
-        type-label (JLabel. "")
-        labels-label (JLabel. "")
-        created-label (JLabel. "")
-        updated-label (JLabel. "")
-
-        ;; Layout
-        metadata-panel (doto (JPanel. (GridLayout. 7 1 5 5))
-                         (.add id-label)
-                         (.add status-label)
-                         (.add priority-label)
-                         (.add type-label)
-                         (.add labels-label)
-                         (.add created-label)
-                         (.add updated-label)
-                         (.setBorder (BorderFactory/createEmptyBorder 10 10 10 10)))
-
-        panel (doto (JPanel. (BorderLayout. 10 10))
-                (.add title-label BorderLayout/NORTH)
-                (.add desc-scroll BorderLayout/CENTER)
-                (.add metadata-panel BorderLayout/SOUTH)
-                (.setBorder (BorderFactory/createEmptyBorder 10 10 10 10)))]
-
-    ;; Store references in state
-    (swap! db/*app-state assoc-in [:ui-refs :detail-panel] panel)
-    (swap! db/*app-state assoc-in [:ui-refs :title-label] title-label)
-    (swap! db/*app-state assoc-in [:ui-refs :description-area] desc-area)
-    (swap! db/*app-state assoc-in [:ui-refs :id-label] id-label)
-    (swap! db/*app-state assoc-in [:ui-refs :status-label] status-label)
-    (swap! db/*app-state assoc-in [:ui-refs :priority-label] priority-label)
-    (swap! db/*app-state assoc-in [:ui-refs :type-label] type-label)
-    (swap! db/*app-state assoc-in [:ui-refs :labels-label] labels-label)
-    (swap! db/*app-state assoc-in [:ui-refs :created-label] created-label)
-    (swap! db/*app-state assoc-in [:ui-refs :updated-label] updated-label)
-
-    panel))
+(defn store-ui-refs! [frame]
+  "Store UI component references in app state for effects layer."
+  (swap! db/*app-state assoc-in [:ui-refs :frame] frame)
+  (swap! db/*app-state assoc-in [:ui-refs :issue-list] (s/select frame [:#issue-list]))
+  (swap! db/*app-state assoc-in [:ui-refs :search-field] (s/select frame [:#search-field]))
+  (swap! db/*app-state assoc-in [:ui-refs :detail-panel] (s/select frame [:#detail-panel]))
+  (swap! db/*app-state assoc-in [:ui-refs :title-label] (s/select frame [:#title-label]))
+  (swap! db/*app-state assoc-in [:ui-refs :description-area] (s/select frame [:#description-area]))
+  (swap! db/*app-state assoc-in [:ui-refs :id-label] (s/select frame [:#id-label]))
+  (swap! db/*app-state assoc-in [:ui-refs :status-label] (s/select frame [:#status-label]))
+  (swap! db/*app-state assoc-in [:ui-refs :priority-label] (s/select frame [:#priority-label]))
+  (swap! db/*app-state assoc-in [:ui-refs :type-label] (s/select frame [:#type-label]))
+  (swap! db/*app-state assoc-in [:ui-refs :labels-label] (s/select frame [:#labels-label]))
+  (swap! db/*app-state assoc-in [:ui-refs :created-label] (s/select frame [:#created-label]))
+  (swap! db/*app-state assoc-in [:ui-refs :updated-label] (s/select frame [:#updated-label])))
 
 ;; ============================================================================
-;; Search Bar (Top)
-;; ============================================================================
-
-(defn create-search-bar []
-  "Create the top search bar."
-  (let [search-field (doto (JTextField. 30)
-                       (.setFont (Font. Font/SANS_SERIF Font/PLAIN 14)))]
-    ;; Listen to text changes
-    (.. search-field getDocument
-        (addDocumentListener
-          (reify DocumentListener
-            (insertUpdate [_ e]
-              (events/handle-event
-                {:event/type ::events/filter-changed
-                 :text (.getText search-field)}))
-            (removeUpdate [_ e]
-              (events/handle-event
-                {:event/type ::events/filter-changed
-                 :text (.getText search-field)}))
-            (changedUpdate [_ e]
-              (events/handle-event
-                {:event/type ::events/filter-changed
-                 :text (.getText search-field)})))))
-    ;; Store reference
-    (swap! db/*app-state assoc-in [:ui-refs :search-field] search-field)
-    search-field))
-
-;; ============================================================================
-;; Toolbar (Buttons)
-;; ============================================================================
-
-(defn create-toolbar []
-  "Create toolbar with action buttons."
-  (let [reload-btn (doto (JButton. "Reload (⌘R)")
-                     (.addActionListener
-                       (reify ActionListener
-                         (actionPerformed [_ e]
-                           (events/handle-event {:event/type ::events/reload-issues})))))
-
-        delete-btn (doto (JButton. "Delete (⌘D)")
-                     (.addActionListener
-                       (reify ActionListener
-                         (actionPerformed [_ e]
-                           (events/handle-event {:event/type ::events/delete-issue})))))
-
-        panel (doto (JPanel. (FlowLayout. FlowLayout/LEFT))
-                (.add reload-btn)
-                (.add delete-btn))]
-    panel))
-
-;; ============================================================================
-;; Main Frame
+;; Main Frame Creation
 ;; ============================================================================
 
 (defn create-main-frame []
   "Create and show the main application window."
-  (let [frame (JFrame. "BD Viewer")
+  (let [frame (create-ui)]
 
-        ;; Components
-        search-bar (create-search-bar)
-        toolbar (create-toolbar)
-        issue-list (create-issue-list)
-        detail-panel (create-detail-panel)
+    ;; Wire up event handlers
+    (wire-events! frame)
 
-        ;; Layout top panel
-        top-panel (doto (JPanel. (BorderLayout. 5 5))
-                    (.add (JLabel. " Search: ") BorderLayout/WEST)
-                    (.add search-bar BorderLayout/CENTER)
-                    (.add toolbar BorderLayout/EAST)
-                    (.setBorder (BorderFactory/createEmptyBorder 5 5 5 5)))
+    ;; Store UI references
+    (store-ui-refs! frame)
 
-        ;; Left panel with scroll
-        left-panel (doto (JScrollPane. issue-list)
-                     (.setPreferredSize (Dimension. 400 600)))
-
-        ;; Split pane
-        split-pane (doto (JSplitPane. JSplitPane/HORIZONTAL_SPLIT
-                                     left-panel
-                                     detail-panel)
-                     (.setDividerLocation 400)
-                     (.setResizeWeight 0.4))]
-
-    ;; Assemble
-    (doto (.getContentPane frame)
-      (.setLayout (BorderLayout.))
-      (.add top-panel BorderLayout/NORTH)
-      (.add split-pane BorderLayout/CENTER))
-
-    ;; Frame setup
-    (doto frame
-      (.setSize 1000 700)
-      (.setDefaultCloseOperation JFrame/EXIT_ON_CLOSE)
-      (.setLocationRelativeTo nil))  ; Center on screen
-
-    ;; Store frame reference
-    (swap! db/*app-state assoc-in [:ui-refs :frame] frame)
-
-    ;; Show it!
-    (.setVisible frame true)
+    ;; Show window
+    (s/show! frame)
 
     ;; Set initial focus to the issue list (not search bar)
     ;; This allows j/k navigation to work immediately!
-    (SwingUtilities/invokeLater
-      (fn []
-        (.requestFocusInWindow issue-list)))
+    (s/invoke-later
+     (fn []
+       (.requestFocusInWindow (s/select frame [:#issue-list]))))
 
     (log/info :create-main-frame :success true)
     frame))
