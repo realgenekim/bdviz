@@ -65,6 +65,19 @@
          :selected-issue nil
          :selected-index -1))
 
+(defmethod handle-event ::toggle-open-filter
+  [_event]
+  (let [current (:show-open-only @db/*app-state)
+        new-value (not current)]
+    (log/info ::toggle-open-filter
+              :old current
+              :new new-value)
+    (swap! db/*app-state assoc
+           :show-open-only new-value
+           ;; Reset selection when filter changes
+           :selected-issue nil
+           :selected-index -1)))
+
 ;; ============================================================================
 ;; Sort Events
 ;; ============================================================================

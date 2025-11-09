@@ -115,12 +115,27 @@
           (proxy [AbstractAction] []
             (actionPerformed [e]
               (log/debug :keyboard/escape-pressed)
-              (events/handle-event {:event/type ::events/clear-filter})))))
+              (events/handle-event {:event/type ::events/clear-filter}))))
+
+    ;; ========================================================================
+    ;; Toggle: o - Toggle between open issues only / all issues
+    ;; ========================================================================
+
+    ;; o - Toggle open/all filter
+    (.put input-map
+          (KeyStroke/getKeyStroke KeyEvent/VK_O 0)
+          "toggle-open")
+    (.put action-map "toggle-open"
+          (proxy [AbstractAction] []
+            (actionPerformed [e]
+              (log/debug :keyboard/o-pressed)
+              (events/handle-event {:event/type ::events/toggle-open-filter})))))
 
   (log/info :setup-keyboard-shortcuts! :success true)
   (log/info :keyboard/shortcuts-enabled
             :j "next issue"
             :k "previous issue"
+            :o "toggle open/all"
             :cmd-d "delete"
             :delete "delete"
             :cmd-delete "delete"
