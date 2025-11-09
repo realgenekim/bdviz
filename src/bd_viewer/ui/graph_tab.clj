@@ -149,6 +149,11 @@
   - Creates edges with different styles per dependency type"
   (let [graph (SingleGraph. "beads-deps")]
 
+    ;; Configure layout to reduce overlap - AGGRESSIVE settings
+    (set-attr! graph "layout.quality" 4) ; Max quality (0-4)
+    (set-attr! graph "layout.force" 5.0) ; Much stronger forces
+    (set-attr! graph "layout.stabilization-limit" 0.99) ; Very high stability threshold ; Higher stability threshold
+
     ;; Add nodes for all issues
     (doseq [issue issues]
       (let [node (.addNode graph (:id issue))
@@ -160,7 +165,9 @@
         (when (= "open" status)
           (set-attr! node "ui.class" "open"))
         (when (= "blocked" status)
-          (set-attr! node "ui.class" "blocked"))))
+          (set-attr! node "ui.class" "blocked"))
+        ;; Increase node weight for stronger repulsion - VERY aggressive
+        (set-attr! node "layout.weight" 10.0)))
 
     ;; Phase 4: Add edges from dependencies! 🎯
     (let [dependencies (beads-db/get-dependencies)]
@@ -170,7 +177,9 @@
         (let [from-node (.getNode graph depends-on-id)
               to-node (.getNode graph issue-id)]
           (when (and from-node to-node)
-            (.addEdge graph (str issue-id "->" depends-on-id) depends-on-id issue-id true)))))
+            (let [edge (.addEdge graph (str issue-id "->" depends-on-id) depends-on-id issue-id true)]
+              ;; Make edges much longer to spread nodes out
+              (set-attr! edge "layout.weight" 5.0))))))
 
     ;; Apply stylesheet from Clojure data
     (set-attr! graph "ui.stylesheet" (style-map->css graph-style))
@@ -214,12 +223,12 @@
         view (.addDefaultView viewer false)]
     (.enableAutoLayout viewer)
 
-    ;; Wait for layout to stabilize
-    (Thread/sleep 2000)
+    ;; Wait longer for layout to stabilize with higher quality settings
+    (Thread/sleep 5000)
 
-    ;; Create image
-    (let [width 1200
-          height 800
+    ;; Create image - HUGE canvas to reduce overlap
+    (let [width 3000
+          height 2000
           image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
           graphics (.createGraphics image)]
       (.setSize view (java.awt.Dimension. width height))
