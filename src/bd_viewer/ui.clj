@@ -4,6 +4,7 @@
             [swing-fx.core :as sf]
             [bd-viewer.db :as db]
             [bd-viewer.events :as events]
+            [bd-viewer.ui.graph-tab :as graph-tab]
             [taoensso.timbre :as log])
   (:import [java.awt Font Dimension]))
 
@@ -17,10 +18,9 @@
 ;; UI Creation with Seesaw
 ;; ============================================================================
 
-(defn create-content []
-  "Create the UI content panel using Seesaw's declarative API.
-  This is a PURE function - returns fresh widgets every time it's called.
-  Called once at startup, and again on hot reload!"
+(defn create-issues-tab []
+  "Create the issues list tab content (original UI).
+  This is a PURE function - returns fresh widgets every time it's called."
   (s/border-panel
    :border 5
 
@@ -90,6 +90,19 @@
             ;; Divider can be dragged to resize - both directions now!
             :divider-size 8
             :resize-weight 0.4)))
+
+(defn create-content []
+  "Create the UI content with tabs.
+  Tab 1: Issues list (original UI)
+  Tab 2: Dependency graph visualization"
+  (s/tabbed-panel
+   :placement :top
+   :tabs [{:title "📋 Issues"
+           :tip "List view of all issues"
+           :content (create-issues-tab)}
+          {:title "🕸️  Graph"
+           :tip "Dependency graph visualization"
+           :content (graph-tab/create-graph-panel)}]))
 
 ;; ============================================================================
 ;; Event Wiring
