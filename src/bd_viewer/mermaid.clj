@@ -13,11 +13,17 @@
 (defn mermaid->image-url
   "Convert Mermaid diagram string to mermaid.ink image URL.
   
-  Uses Base64 encoding to embed diagram in URL."
-  [mermaid-str]
+  Uses Base64 encoding to embed diagram in URL.
+  
+  Options:
+  - :width - Image width in pixels (optional)"
+  [mermaid-str & {:keys [width]}]
   (let [encoder (Base64/getEncoder)
-        b64 (.encodeToString encoder (.getBytes mermaid-str "UTF-8"))]
-    (str "https://mermaid.ink/img/" b64)))
+        b64 (.encodeToString encoder (.getBytes mermaid-str "UTF-8"))
+        base-url (str "https://mermaid.ink/img/" b64)]
+    (if width
+      (str base-url "?width=" width)
+      base-url)))
 
 (defn generate-mermaid-diagram
   "Generate Mermaid diagram from issues and dependencies.
@@ -79,10 +85,13 @@
 (defn fetch-diagram-image
   "Fetch rendered Mermaid diagram from mermaid.ink.
   
+  Options:
+  - :width - Image width in pixels (optional)
+  
   Returns BufferedImage or nil on error."
-  [mermaid-str]
+  [mermaid-str & {:keys [width]}]
   (try
-    (let [url-str (mermaid->image-url mermaid-str)
+    (let [url-str (mermaid->image-url mermaid-str :width width)
           url (URL. url-str)]
       (log/info :fetch-diagram-image :fetching-from url-str)
       (ImageIO/read url))

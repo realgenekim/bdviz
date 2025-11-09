@@ -323,10 +323,15 @@
     (require 'bd-viewer.events :reload)
     (require 'bd-viewer.effects.swing :reload)
     (require 'bd-viewer.keyboard :reload)
+    (require 'bd-viewer.mermaid :reload)
+    (require 'bd-viewer.ui.graph-tab2 :reload)
     (require 'bd-viewer.ui :reload)
 
     ;; Rebuild UI with fresh view functions
     ((resolve 'bd-viewer.ui/rebuild-ui!))
+
+    ;; Also rebuild graph tab with fresh diagram
+    ((resolve 'bd-viewer.ui/rebuild-graph-tab!))
 
     (log/info ::reload-code :success true)
     (catch Exception e

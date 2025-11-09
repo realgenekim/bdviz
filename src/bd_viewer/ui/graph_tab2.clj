@@ -9,16 +9,18 @@
             [taoensso.timbre :as log]
             [clojure.java.io :as io])
   (:import [java.awt Font BorderLayout]
-           [javax.swing JPanel JLabel ImageIcon]))
+           [javax.swing JPanel JLabel ImageIcon JScrollPane]))
 
 (defn create-diagram-panel
   "Create panel displaying Mermaid diagram as image.
   
-  Fetches diagram from mermaid.ink, saves it to target directory, and displays in a JLabel."
+  Fetches diagram from mermaid.ink with 2000px width for better readability,
+  and displays in a scrollable panel."
   [issues deps]
   (try
     (let [mermaid-str (mermaid/generate-mermaid-diagram issues deps)
-          img (mermaid/fetch-diagram-image mermaid-str)]
+          ;; Request 2000px wide image from mermaid.ink for better readability
+          img (mermaid/fetch-diagram-image mermaid-str :width 2000)]
       (if img
         (do
           ;; Save diagram to target directory
@@ -27,11 +29,11 @@
             (javax.imageio.ImageIO/write img "png" (io/file output-file))
             (log/info :save-diagram :success true :file output-file))
 
-          ;; Display in UI
+          ;; Display in UI with scroll pane
           (let [icon (ImageIcon. img)
-                label (JLabel. icon)]
-            (doto (JPanel. (BorderLayout.))
-              (.add label BorderLayout/CENTER))))
+                label (JLabel. icon)
+                scroll-pane (JScrollPane. label)]
+            scroll-pane))
         ;; Error case - show message
         (s/label :text "Error: Could not fetch diagram from mermaid.ink"
                  :font (Font. Font/SANS_SERIF Font/BOLD 16))))
