@@ -32,19 +32,34 @@
   ;; Watch issues list - update when issues or filter changes
   (sf/watch! db/*app-state [:issues]
              (fn [old new]
+               ;; Update main issues list
                (when-let [listbox (s/select frame [:#issue-list])]
                  (let [filtered-issues (db/get-filtered-issues)
                        display-items (mapv format-issue-item filtered-issues)]
                    (log/debug :update-issue-list! :count (count filtered-issues))
+                   (s/config! listbox :model display-items)))
+
+               ;; Update list view listbox
+               (when-let [listbox (s/select frame [:#list-view-listbox])]
+                 (let [filtered-issues (db/get-filtered-issues)
+                       display-items (mapv format-issue-item filtered-issues)]
+                   (log/debug :update-list-view-listbox! :count (count filtered-issues))
                    (s/config! listbox :model display-items)))))
 
   ;; Watch filter text - update list when filter changes
   (sf/watch! db/*app-state [:filter-text]
              (fn [old new]
+               ;; Update main issues list
                (when-let [listbox (s/select frame [:#issue-list])]
                  (let [filtered-issues (db/get-filtered-issues)
                        display-items (mapv format-issue-item filtered-issues)]
                    (log/debug :update-filtered-list! :count (count filtered-issues))
+                   (s/config! listbox :model display-items)))
+
+               ;; Update list view listbox
+               (when-let [listbox (s/select frame [:#list-view-listbox])]
+                 (let [filtered-issues (db/get-filtered-issues)
+                       display-items (mapv format-issue-item filtered-issues)]
                    (s/config! listbox :model display-items)))
 
                ;; Also sync search field text (for programmatic filter changes)
@@ -64,6 +79,12 @@
                    (log/debug :update-open-only-filter! :show-open-only new :count (count filtered-issues))
                    (s/config! listbox :model display-items)))
 
+               ;; Update list view listbox
+               (when-let [listbox (s/select frame [:#list-view-listbox])]
+                 (let [filtered-issues (db/get-filtered-issues)
+                       display-items (mapv format-issue-item filtered-issues)]
+                   (s/config! listbox :model display-items)))
+
                ;; Update tree view
                (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
                  (refresh-fn))))
@@ -71,8 +92,17 @@
   ;; Watch selected index - update JList selection
   (sf/watch! db/*app-state [:selected-index]
              (fn [old new]
+               ;; Update main issues list
                (when-let [^javax.swing.JList listbox (s/select frame [:#issue-list])]
                  (log/debug :update-selection! :index new)
+                 (if (>= new 0)
+                   (do
+                     (.setSelectedIndex listbox new)
+                     (.ensureIndexIsVisible listbox new))
+                   (.clearSelection listbox)))
+
+               ;; Update list view listbox
+               (when-let [^javax.swing.JList listbox (s/select frame [:#list-view-listbox])]
                  (if (>= new 0)
                    (do
                      (.setSelectedIndex listbox new)
@@ -154,9 +184,10 @@
                                (when-let [updated-label (s/select frame [(keyword (str prefix "updated-label"))])]
                                  (s/config! updated-label :text "")))))]
 
-                   ;; Update both detail panels (issues tab and tree tab)
+                   ;; Update all three detail panels (issues tab, tree tab, list tab)
                    (update-detail-panel! "#")
                    (update-detail-panel! "#tree-")
+                   (update-detail-panel! "#list-")
 
                    ;; Refresh tree view to highlight selected issue
                    (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
@@ -170,6 +201,12 @@
        (let [filtered-issues (db/get-filtered-issues)
              display-items (mapv format-issue-item filtered-issues)]
          (log/info :initial-population! :count (count filtered-issues))
+         (s/config! listbox :model display-items)))
+
+     (when-let [listbox (s/select frame [:#list-view-listbox])]
+       (let [filtered-issues (db/get-filtered-issues)
+             display-items (mapv format-issue-item filtered-issues)]
+         (log/info :initial-population-list-view! :count (count filtered-issues))
          (s/config! listbox :model display-items)))))
 
   (log/info :setup-watchers! :success true))

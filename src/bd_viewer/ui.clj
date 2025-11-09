@@ -96,60 +96,95 @@
             :resize-weight 0.4)))
 
 (defn create-content []
-  "Create the UI content with tabs.
-  Tab 1: Tree View (NEW - tree on left, details on right)
-  Tab 2: Issues list (original UI)
-  Tab 3: Dependency graph (Mermaid PNG - original)
-  Tab 4: ASCII Tree (instant, text-based)
-  Tab 5: Clickable Tree (HTML with links)
-  Tab 6: SVG Interactive (DISABLED - Batik errors)"
+  "Create the UI content with tabs."
   (s/tabbed-panel
-   :id :content ; ID for easy selection when rebuilding graph tabs
+   :id :content
    :placement :top
    :tabs [{:title "🌲 Tree View"
            :tip "Tree view with details pane (j/k navigation)"
-           :content (s/left-right-split
-                     ;; Left: Tree view
-                     (tree-view/create-tree-view)
-
-                     ;; Right: Detail panel (same as issues tab)
-                     (s/border-panel
-                      :id :tree-detail-panel
-                      :border [10 10 10 10]
-                      :minimum-size [200 :by 400]
-
-                      ;; Title at top
-                      :north (s/label :id :tree-title-label
-                                      :text "No issue selected"
-                                      :font (Font. Font/SANS_SERIF Font/BOLD 20))
-
-                      ;; Description in center
-                      :center (s/scrollable
-                               (s/text :id :tree-description-area
-                                       :multi-line? true
-                                       :editable? false
-                                       :rows 10
-                                       :columns 40
-                                       :wrap-lines? true
-                                       :font (Font. Font/SANS_SERIF Font/PLAIN 14)))
-
-                      ;; Metadata at bottom
-                      :south (s/vertical-panel
-                              :id :tree-metadata-panel
-                              :border [10 10 10 10]
-                              :items [(s/label :id :tree-id-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
-                                      (s/label :id :tree-status-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
-                                      (s/label :id :tree-priority-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
-                                      (s/label :id :tree-type-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
-                                      (s/label :id :tree-labels-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
-                                      (s/label :id :tree-created-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
-                                      (s/label :id :tree-updated-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))]))
-
-                     ;; Split settings
-                     :divider-size 8
-                     :resize-weight 0.4)}
-          {:title "📋 Issues"
-           :tip "List view of all issues with filtering and search"
+           :content (s/border-panel
+                     :north (s/horizontal-panel
+                             :items [(s/button :id :tree-reload-code-btn
+                                               :text "Reload Code (⌘⇧R)"
+                                               :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                     (s/button :id :tree-reload-btn
+                                               :text "Reload (⌘R)"
+                                               :font (Font. Font/SANS_SERIF Font/PLAIN 14))])
+                     :center (s/left-right-split
+                              (tree-view/create-tree-view)
+                              (s/border-panel
+                               :id :tree-detail-panel
+                               :border [10 10 10 10]
+                               :minimum-size [200 :by 400]
+                               :north (s/label :id :tree-title-label
+                                               :text "No issue selected"
+                                               :font (Font. Font/SANS_SERIF Font/BOLD 20))
+                               :center (s/scrollable
+                                        (s/text :id :tree-description-area
+                                                :multi-line? true
+                                                :editable? false
+                                                :rows 10
+                                                :columns 40
+                                                :wrap-lines? true
+                                                :font (Font. Font/SANS_SERIF Font/PLAIN 14)))
+                               :south (s/vertical-panel
+                                       :id :tree-metadata-panel
+                                       :border [10 10 10 10]
+                                       :items [(s/label :id :tree-id-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :tree-status-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :tree-priority-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :tree-type-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :tree-labels-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :tree-created-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :tree-updated-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))]))
+                              :divider-size 8
+                              :resize-weight 0.4))}
+          {:title "📋 List View"
+           :tip "Linear list with details pane (j/k navigation)"
+           :content (s/border-panel
+                     :north (s/horizontal-panel
+                             :items [(s/button :id :list-reload-code-btn
+                                               :text "Reload Code (⌘⇧R)"
+                                               :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                     (s/button :id :list-reload-btn
+                                               :text "Reload (⌘R)"
+                                               :font (Font. Font/SANS_SERIF Font/PLAIN 14))])
+                     :center (s/left-right-split
+                              (s/scrollable
+                               (s/listbox :id :list-view-listbox
+                                          :font (Font. Font/MONOSPACED Font/PLAIN 14)
+                                          :selection-mode :single)
+                               :preferred-size [400 :by 600]
+                               :minimum-size [200 :by 400])
+                              (s/border-panel
+                               :id :list-detail-panel
+                               :border [10 10 10 10]
+                               :minimum-size [200 :by 400]
+                               :north (s/label :id :list-title-label
+                                               :text "No issue selected"
+                                               :font (Font. Font/SANS_SERIF Font/BOLD 20))
+                               :center (s/scrollable
+                                        (s/text :id :list-description-area
+                                                :multi-line? true
+                                                :editable? false
+                                                :rows 10
+                                                :columns 40
+                                                :wrap-lines? true
+                                                :font (Font. Font/SANS_SERIF Font/PLAIN 14)))
+                               :south (s/vertical-panel
+                                       :id :list-metadata-panel
+                                       :border [10 10 10 10]
+                                       :items [(s/label :id :list-id-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :list-status-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :list-priority-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :list-type-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :list-labels-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :list-created-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                               (s/label :id :list-updated-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))]))
+                              :divider-size 8
+                              :resize-weight 0.4))}
+          {:title "🔍 Issues"
+           :tip "List view with search and filtering"
            :content (create-issues-tab)}
           {:title "🕸️  Graph (PNG)"
            :tip "Mermaid dependency graph (static image)"
@@ -159,11 +194,7 @@
            :content (graph-ascii/create-graph-panel)}
           {:title "🔗 Clickable Tree"
            :tip "HTML tree with clickable issue links"
-           :content (graph-html/create-graph-panel)}
-          ;; SVG tab disabled due to Batik errors with mermaid.ink SVG
-          #_{:title "⚡ SVG Interactive"
-             :tip "Zoomable/pannable vector graphics (scroll to zoom, drag to pan)"
-             :content (graph-svg/create-graph-panel)}]))
+           :content (graph-html/create-graph-panel)}]))
 
 ;; ============================================================================
 ;; Event Wiring
@@ -192,12 +223,26 @@
                       :issue-id (:id issue)
                       :index index}))))))
 
-  ;; Reload Code button
+  ;; List view listbox - listen to selection changes
+  (when-let [list-view-listbox (s/select frame [:#list-view-listbox])]
+    (s/listen list-view-listbox :selection
+              (fn [e]
+                (when-let [selected (s/selection e)]
+                  (let [index (.getSelectedIndex (s/to-widget e))
+                        filtered (db/get-filtered-issues)
+                        issue (nth filtered index nil)]
+                    (when issue
+                      (events/handle-event
+                       {:event/type ::events/issue-selected
+                        :issue-id (:id issue)
+                        :index index})))))))
+
+  ;; Reload Code button (Issues tab)
   (s/listen (s/select frame [:#reload-code-btn]) :action
             (fn [_]
               (events/handle-event {:event/type ::events/reload-code})))
 
-  ;; Reload button
+  ;; Reload button (Issues tab)
   (s/listen (s/select frame [:#reload-btn]) :action
             (fn [_]
               (events/handle-event {:event/type ::events/reload-issues})))
@@ -205,7 +250,29 @@
   ;; Delete button
   (s/listen (s/select frame [:#delete-btn]) :action
             (fn [_]
-              (events/handle-event {:event/type ::events/delete-issue}))))
+              (events/handle-event {:event/type ::events/delete-issue})))
+
+  ;; Tree view buttons
+  (when-let [btn (s/select frame [:#tree-reload-code-btn])]
+    (s/listen btn :action
+              (fn [_]
+                (events/handle-event {:event/type ::events/reload-code}))))
+
+  (when-let [btn (s/select frame [:#tree-reload-btn])]
+    (s/listen btn :action
+              (fn [_]
+                (events/handle-event {:event/type ::events/reload-issues}))))
+
+  ;; List view buttons
+  (when-let [btn (s/select frame [:#list-reload-code-btn])]
+    (s/listen btn :action
+              (fn [_]
+                (events/handle-event {:event/type ::events/reload-code}))))
+
+  (when-let [btn (s/select frame [:#list-reload-btn])]
+    (s/listen btn :action
+              (fn [_]
+                (events/handle-event {:event/type ::events/reload-issues})))))
 
 ;; ============================================================================
 ;; UI Reference Storage
@@ -310,12 +377,13 @@
      (fn []
        (log/info :rebuild-graph-tab! :start true)
        (let [tabs (s/select frame [:#content])]
-         ;; Rebuild all graph tabs with fresh data
-         (.setComponentAt tabs 1 (graph-tab/create-graph-panel)) ; PNG
-         (.setComponentAt tabs 2 (graph-ascii/create-graph-panel)) ; ASCII
-         (.setComponentAt tabs 3 (graph-html/create-graph-panel)) ; Clickable
-         (.setComponentAt tabs 4 (graph-svg/create-graph-panel)) ; SVG
-         (log/info :rebuild-graph-tab! :success true :tabs-rebuilt 4))))))
+         ;; Tab indices: 0=Tree, 1=List, 2=Issues, 3=PNG, 4=ASCII, 5=Clickable
+         (.setComponentAt tabs 3 (graph-tab/create-graph-panel)) ; PNG
+         (.setComponentAt tabs 4 (graph-ascii/create-graph-panel)) ; ASCII
+         (.setComponentAt tabs 5 (graph-html/create-graph-panel)) ; Clickable
+         ;; SVG tab disabled due to Batik errors with mermaid.ink SVG format
+         ;; (.setComponentAt tabs 6 (graph-svg/create-graph-panel)) ; SVG
+         (log/info :rebuild-graph-tab! :success true :tabs-rebuilt 3))))))
 
 ;; ============================================================================
 ;; Main Frame Creation

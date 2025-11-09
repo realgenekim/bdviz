@@ -16,6 +16,49 @@
            [javax.swing.text StyleConstants SimpleAttributeSet]
            [java.awt.event MouseAdapter]))
 
+;; ============================================================================
+;; Customization Variables - Change these to customize tree appearance!
+;; ============================================================================
+
+(def tree-indent-spaces
+  "Number of spaces for each indentation level in the tree.
+  Adjust this to make the tree more or less indented."
+  4)
+
+(def tree-font-family
+  "Font family for tree display."
+  "Monaco, monospace")
+
+(def tree-font-size
+  "Font size in pixels for tree display.
+  Increase for larger text, decrease for smaller."
+  12)
+
+(def tree-color-open
+  "Hex color for open issues (default green)."
+  "#2ECC71")
+
+(def tree-color-in-progress
+  "Hex color for in-progress issues (default yellow/orange)."
+  "#FFC107")
+
+(def tree-color-closed
+  "Hex color for closed issues (default gray)."
+  "#95A5A6")
+
+(def tree-color-selected-bg
+  "Background color for selected issue (default light blue)."
+  "#E3F2FD")
+
+(def tree-title-max-length
+  "Maximum length of issue title to display in tree.
+  Longer titles will be truncated."
+  50)
+
+;; ============================================================================
+;; Tree Building Functions
+;; ============================================================================
+
 (defn build-dep-map
   "Build a map of issue-id -> [dependent-issue-ids]."
   [deps]
@@ -46,14 +89,14 @@
   [issue selected-id]
   (let [id (:id issue)
         num (re-find #"\d+$" id)
-        title (html-escape (subs (:title issue) 0 (min 50 (count (:title issue)))))
+        title (html-escape (subs (:title issue) 0 (min tree-title-max-length (count (:title issue)))))
         status (:status issue)
         is-selected (= id selected-id)
-        bg-color (if is-selected "#E3F2FD" "transparent")
+        bg-color (if is-selected tree-color-selected-bg "transparent")
         color (case status
-                "open" "#2ECC71"
-                "in-progress" "#FFC107"
-                "closed" "#95A5A6"
+                "open" tree-color-open
+                "in-progress" tree-color-in-progress
+                "closed" tree-color-closed
                 "#000000")
         status-marker (case status
                         "in-progress" "● "
@@ -75,7 +118,9 @@
          children (map issues-by-id children-ids)
          connector (if is-last "└── " "├── ")
          line (str prefix connector (render-issue-html issue selected-id) "<br>")
-         child-prefix (str prefix (if is-last "&nbsp;&nbsp;&nbsp;&nbsp;" "│&nbsp;&nbsp;&nbsp;"))]
+         ;; Build child prefix using configured indent spaces
+         indent-str (apply str (repeat tree-indent-spaces "&nbsp;"))
+         child-prefix (str prefix (if is-last indent-str (str "│" (apply str (repeat (dec tree-indent-spaces) "&nbsp")))))]
 
      (str line
           (apply str
@@ -98,11 +143,10 @@
 
   ([issue dep-map issues-by-id acc]
    (let [children-ids (get dep-map (:id issue) [])
-         children (map issues-by-id children-ids)
+         children (keep issues-by-id children-ids)
          new-acc (conj acc issue)]
      (reduce (fn [a child]
-               (when child
-                 (flatten-tree child dep-map issues-by-id a)))
+               (flatten-tree child dep-map issues-by-id a))
              new-acc
              children))))
 
@@ -121,7 +165,7 @@
         issues-by-id (into {} (map (fn [i] [(:id i) i]) issues))
         roots (find-roots issues deps)]
 
-    (str "<html><body style='font-family: Monaco, monospace; font-size: 14px; padding: 10px;'>"
+    (str "<html><body style='font-family: " tree-font-family "; font-size: " tree-font-size "px; padding: 10px;'>"
          (if (seq roots)
            (apply str
                   (map-indexed
@@ -138,19 +182,20 @@
   (reify HyperlinkListener
     (hyperlinkUpdate [this e]
       (when (= (.getEventType e) HyperlinkEvent$EventType/ACTIVATED)
-        (let [url-str (str (.getURL e))
-              issue-id (last (clojure.string/split url-str #"#"))]
-          (log/info :hyperlink-clicked :issue-id issue-id)
-          ;; Find the issue in the flat list
-          (let [flat-issues @(get-in @db/*app-state [:ui-refs :tree-flat-issues])
-                index (first (keep-indexed
-                              (fn [idx issue]
-                                (when (= (:id issue) issue-id) idx))
-                              flat-issues))]
-            (when index
-              (events/handle-event {:event/type ::events/issue-selected
-                                    :issue-id issue-id
-                                    :index index}))))))))
+        (let [description (.getDescription e)
+              issue-id (when description
+                         (last (clojure.string/split description #"#")))]
+          (log/info :hyperlink-clicked :issue-id issue-id :description description)
+          (when issue-id
+            (let [issues (db/get-filtered-issues)
+                  index (first (keep-indexed
+                                (fn [idx issue]
+                                  (when (= (:id issue) issue-id) idx))
+                                issues))]
+              (when index
+                (events/handle-event {:event/type ::events/issue-selected
+                                      :issue-id issue-id
+                                      :index index})))))))))
 
 (defn refresh-tree-html!
   "Refresh the tree HTML with current selection highlighting."
@@ -161,12 +206,7 @@
        (.setText text-pane html)))))
 
 (defn create-tree-panel
-  "Create tree view panel with keyboard navigation.
-  
-  Returns a map with:
-  - :component - The JScrollPane containing the tree
-  - :refresh-fn - Function to call to refresh the tree display
-  - :flat-issues - Atom containing flat list of issues in display order"
+  "Create tree view panel with keyboard navigation."
   [issues deps]
   (let [selected-id (:selected-issue @db/*app-state)
         flat-issues (atom (build-flat-issue-list issues deps))
@@ -205,26 +245,18 @@
      :flat-issues flat-issues}))
 
 (defn create-tree-view
-  "Create the tree view component for the main UI.
-  
-  Returns the component ready to be placed in the left pane of a split."
+  "Create the tree view component for the main UI."
   []
   (let [issues (:issues @db/*app-state)
         deps (beads-db/get-dependencies)
-
-        ;; Filter to non-closed issues
         open-issues (filter #(not= "closed" (:status %)) issues)
         open-ids (set (map :id open-issues))
-
-        ;; Filter deps to only include open issues
         open-deps (filter (fn [{:keys [issue-id depends-on-id]}]
                             (and (open-ids issue-id)
                                  (open-ids depends-on-id)))
                           deps)
-
         tree-panel (create-tree-panel open-issues open-deps)]
 
-    ;; Store references for refresh
     (swap! db/*app-state assoc-in [:ui-refs :tree-refresh-fn] (:refresh-fn tree-panel))
     (swap! db/*app-state assoc-in [:ui-refs :tree-flat-issues] (:flat-issues tree-panel))
     (swap! db/*app-state assoc-in [:ui-refs :tree-text-pane] (:text-pane tree-panel))
