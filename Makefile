@@ -1,5 +1,5 @@
 run:
-	clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core
+	clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core 2>&1 | tee 00LOGS.txt
 
 runtests-once:
 	@echo "Checking compilation..."

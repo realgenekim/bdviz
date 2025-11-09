@@ -3,6 +3,8 @@
 
   Vim-style navigation and power-user shortcuts!"
   (:require [bd-viewer.events :as events]
+            [bd-viewer.db :as db]
+            [swing-fx.core :as sf]
             [taoensso.timbre :as log])
   (:import [javax.swing JComponent KeyStroke AbstractAction]
            [java.awt.event KeyEvent]
@@ -129,7 +131,12 @@
           (proxy [AbstractAction] []
             (actionPerformed [e]
               (log/debug :keyboard/o-pressed)
-              (events/handle-event {:event/type ::events/toggle-open-filter})))))
+              (events/handle-event {:event/type ::events/toggle-open-filter})
+              ;; Show notification
+              (let [show-open? (:show-open-only @db/*app-state)]
+                (sf/notify! frame (if show-open?
+                                    "Showing open issues only"
+                                    "Showing all issues")))))))
 
   (log/info :setup-keyboard-shortcuts! :success true)
   (log/info :keyboard/shortcuts-enabled

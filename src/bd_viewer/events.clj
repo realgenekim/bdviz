@@ -277,3 +277,10 @@
   ;; Test delete (be careful!)
   ;; (handle-event {:event/type ::delete-issue})
   )
+
+(defmethod handle-event ::reload-code
+  [_event]
+  (log/info ::reload-code :start true)
+  ;; TODO: Implement hot reload - for now just notify
+  (log/info ::reload-code :status "Restart app to see code changes")
+  nil)

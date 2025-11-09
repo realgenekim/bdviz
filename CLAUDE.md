@@ -85,6 +85,13 @@ bd list --limit 10
 4. Use `make runtests-once` for compilation checks
 5. Use clojure-mcp for all .clj and .edn file edits
 
+### Debugging
+
+- **Logs**: All output from `make run` is saved to `./00LOGS.txt` (automatically via `tee`)
+- **State dump**: Current app state is saved to `./state.edn` on every state change
+- **Check logs**: `cat 00LOGS.txt` or `tail -f 00LOGS.txt` to watch logs in real-time
+- **Check state**: `cat state.edn` to see current app state (issues, selection, filters, etc.)
+
 ### Reload Features
 
 - **Reload Config** button: Refresh issue list from `bd list --json`

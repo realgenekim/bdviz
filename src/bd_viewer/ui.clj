@@ -28,7 +28,9 @@
                             :columns 30
                             :font (Font. Font/SANS_SERIF Font/PLAIN 14))
             :east (s/horizontal-panel
-                   :items [(s/button :id :reload-btn
+                   :items [(s/button :id :reload-code-btn
+                                     :text "Reload Code (⌘⇧R)")
+                           (s/button :id :reload-btn
                                      :text "Reload (⌘R)")
                            (s/button :id :delete-btn
                                      :text "Delete (⌘D)")]))
@@ -103,6 +105,11 @@
                      {:event/type ::events/issue-selected
                       :issue-id (:id issue)
                       :index index}))))))
+
+  ;; Reload Code button
+  (s/listen (s/select frame [:#reload-code-btn]) :action
+            (fn [_]
+              (events/handle-event {:event/type ::events/reload-code})))
 
   ;; Reload button
   (s/listen (s/select frame [:#reload-btn]) :action

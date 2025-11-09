@@ -6,8 +6,8 @@
             [seesaw.core :as s]
             [bd-viewer.db :as db]
             [taoensso.timbre :as log])
-  (:import [javax.swing DefaultListModel JList JLabel JTextArea]
-           [java.awt Color]))
+  (:import [javax.swing DefaultListModel JList JLabel JTextArea Timer]
+           [java.awt Color Font]))
 
 ;; ============================================================================
 ;; Watcher Setup with swing-fx
@@ -22,33 +22,30 @@
   ;; Watch issues list - update when issues or filter changes
   (sf/watch! db/*app-state [:issues]
              (fn [old new]
-               (when-let [jlist ^JList (s/select frame [:#issue-list])]
-                 (let [^DefaultListModel model (.getModel jlist)
-                       filtered-issues (db/get-filtered-issues)]
+               (when-let [listbox (s/select frame [:#issue-list])]
+                 (let [filtered-issues (db/get-filtered-issues)
+                       display-items (mapv (fn [issue]
+                                             (str (:id issue)
+                                                  " [" (db/priority-label (:priority issue)) "] "
+                                                  (:title issue)))
+                                           filtered-issues)]
                    (log/debug :update-issue-list! :count (count filtered-issues))
-                   (.clear model)
-                   (doseq [issue filtered-issues]
-            ;; Display as: "bd-viewer-1 [P0] Title here"
-                     (let [display-text (str (:id issue)
-                                             " [" (db/priority-label (:priority issue)) "] "
-                                             (:title issue))]
-                       (.addElement model display-text)))))))
+                   (s/config! listbox :model display-items)))))
 
   ;; Watch filter text - update list when filter changes
   (sf/watch! db/*app-state [:filter-text]
              (fn [old new]
-               (when-let [jlist ^JList (s/select frame [:#issue-list])]
-                 (let [^DefaultListModel model (.getModel jlist)
-                       filtered-issues (db/get-filtered-issues)]
+               (when-let [listbox (s/select frame [:#issue-list])]
+                 (let [filtered-issues (db/get-filtered-issues)
+                       display-items (mapv (fn [issue]
+                                             (str (:id issue)
+                                                  " [" (db/priority-label (:priority issue)) "] "
+                                                  (:title issue)))
+                                           filtered-issues)]
                    (log/debug :update-filtered-list! :count (count filtered-issues))
-                   (.clear model)
-                   (doseq [issue filtered-issues]
-                     (let [display-text (str (:id issue)
-                                             " [" (db/priority-label (:priority issue)) "] "
-                                             (:title issue))]
-                       (.addElement model display-text)))))
+                   (s/config! listbox :model display-items)))
 
-      ;; Also sync search field text (for programmatic filter changes)
+               ;; Also sync search field text (for programmatic filter changes)
                (when-let [search-field (s/select frame [:#search-field])]
                  (let [current-text (s/text search-field)]
                    (when (not= current-text new)
@@ -58,27 +55,24 @@
   ;; Watch show-open-only toggle - update list
   (sf/watch! db/*app-state [:show-open-only]
              (fn [old new]
-               (when-let [jlist ^JList (s/select frame [:#issue-list])]
-                 (let [^DefaultListModel model (.getModel jlist)
-                       filtered-issues (db/get-filtered-issues)]
+               (when-let [listbox (s/select frame [:#issue-list])]
+                 (let [filtered-issues (db/get-filtered-issues)
+                       display-items (mapv (fn [issue]
+                                             (str (:id issue)
+                                                  " [" (db/priority-label (:priority issue)) "] "
+                                                  (:title issue)))
+                                           filtered-issues)]
                    (log/debug :update-open-only-filter! :show-open-only new :count (count filtered-issues))
-                   (.clear model)
-                   (doseq [issue filtered-issues]
-                     (let [display-text (str (:id issue)
-                                             " [" (db/priority-label (:priority issue)) "] "
-                                             (:title issue))]
-                       (.addElement model display-text)))))))
+                   (s/config! listbox :model display-items)))))
 
   ;; Watch selected index - update JList selection
   (sf/watch! db/*app-state [:selected-index]
              (fn [old new]
-               (when-let [jlist ^JList (s/select frame [:#issue-list])]
+               (when-let [listbox (s/select frame [:#issue-list])]
                  (log/debug :update-selection! :index new)
                  (if (>= new 0)
-                   (do
-                     (.setSelectedIndex jlist new)
-                     (.ensureIndexIsVisible jlist new)) ; Scroll to make visible
-                   (.clearSelection jlist)))))
+                   (s/selection! listbox new)
+                   (s/selection! listbox nil)))))
 
   ;; Watch selected issue - update detail panel
   (sf/watch! db/*app-state [:selected-issue]
@@ -87,7 +81,7 @@
                  (log/debug :update-detail-panel! :issue-id new :has-issue (some? issue))
 
                  (if issue
-          ;; Populate with issue data
+                   ;; Populate with issue data
                    (do
                      (when-let [title-label (s/select frame [:#title-label])]
                        (s/config! title-label :text (:title issue)))
@@ -101,7 +95,7 @@
                      (when-let [^JLabel status-label (s/select frame [:#status-label])]
                        (let [status (:status issue)]
                          (.setText status-label (str "Status: " status))
-                ;; Color code status
+                         ;; Color code status
                          (.setForeground status-label
                                          (case status
                                            "open" (Color. 34 139 34) ; Forest green
@@ -132,7 +126,7 @@
                        (s/config! updated-label
                                   :text (str "Updated: " (:updated-at issue)))))
 
-          ;; No issue selected - clear everything
+                   ;; No issue selected - clear everything
                    (do
                      (when-let [title-label (s/select frame [:#title-label])]
                        (s/config! title-label :text "No issue selected"))
@@ -152,6 +146,20 @@
                        (s/config! created-label :text ""))
                      (when-let [updated-label (s/select frame [:#updated-label])]
                        (s/config! updated-label :text "")))))))
+
+  ;; IMPORTANT: Do initial population on EDT!
+  ;; Watchers only fire on changes, so we need to manually populate initially
+  (javax.swing.SwingUtilities/invokeLater
+   (fn []
+     (when-let [listbox (s/select frame [:#issue-list])]
+       (let [filtered-issues (db/get-filtered-issues)
+             display-items (mapv (fn [issue]
+                                   (str (:id issue)
+                                        " [" (db/priority-label (:priority issue)) "] "
+                                        (:title issue)))
+                                 filtered-issues)]
+         (log/info :initial-population! :count (count filtered-issues))
+         (s/config! listbox :model display-items)))))
 
   (log/info :setup-watchers! :success true))
 
