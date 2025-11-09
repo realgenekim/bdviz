@@ -106,12 +106,12 @@
 (def graph-style
   "Graph styling - wide rectangular boxes with normal text"
   {:node {:shape "box"
-          :size node-size ; 250px wide × 20px tall
+          :size node-size ; 250px wide × 40px tall
           :fill-color "white"
           :stroke-mode "plain"
           :stroke-color "black"
           :stroke-width "1px"
-          :text-size node-text-size ; 9pt font
+          :text-size node-text-size ; 20pt font
           :text-alignment "center"}
    :node-open {:fill-color "#E8F8F5"
                :stroke-color "#2ECC71"
