@@ -91,7 +91,8 @@
           (proxy [AbstractAction] []
             (actionPerformed [e]
               (log/debug :keyboard/cmd-shift-r-pressed)
-              (events/handle-event {:event/type ::events/reload-code}))))
+              (events/handle-event {:event/type ::events/reload-code})
+              (sf/notify! frame "Code reloaded!"))))
 
     ;; Cmd+R - Reload issues
     (.put input-map
@@ -101,7 +102,9 @@
           (proxy [AbstractAction] []
             (actionPerformed [e]
               (log/debug :keyboard/cmd-r-pressed)
-              (events/handle-event {:event/type ::events/reload-issues}))))
+              (events/handle-event {:event/type ::events/reload-issues})
+              (let [count (count (:issues @db/*app-state))]
+                (sf/notify! frame (str "Reloaded " count " issues!"))))))
 
     ;; ========================================================================
     ;; Search: Cmd+F, Escape
@@ -163,7 +166,23 @@
               (when-let [issue-id (:selected-issue @db/*app-state)]
                 (let [result (events/handle-event {:event/type ::events/close-issue})]
                   (when (= result :success)
-                    (sf/notify! frame (str "Issue " issue-id " closed!")))))))))
+                    (sf/notify! frame (str "Issue " issue-id " closed!"))))))))
+
+    ;; ========================================================================
+    ;; TEST: z - Trigger divide-by-zero error (tests error notification)
+    ;; ========================================================================
+
+    ;; z - Test error notification with divide by zero
+    (.put input-map
+          (KeyStroke/getKeyStroke KeyEvent/VK_Z 0)
+          "test-error")
+    (.put action-map "test-error"
+          (proxy [AbstractAction] []
+            (actionPerformed [e]
+              (log/info :keyboard/z-pressed :testing "Triggering divide-by-zero error")
+              ;; Use Thread directly so exception triggers uncaught handler
+              ;; (future catches exceptions internally and won't trigger the handler)
+              (.start (Thread. (fn [] (/ 1 0))))))))
 
   (log/info :setup-keyboard-shortcuts! :success true)
   (log/info :keyboard/shortcuts-enabled
@@ -171,6 +190,7 @@
             :k "previous issue"
             :o "toggle open/all"
             :c "close issue"
+            :z "test error notification (divide by zero)"
             :cmd-d "delete"
             :delete "delete"
             :cmd-delete "delete"

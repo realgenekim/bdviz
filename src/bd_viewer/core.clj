@@ -23,6 +23,18 @@
     (catch Exception e
       (log/error :dump-state-to-file! :exception (.getMessage e)))))
 
+(defn setup-exception-handler!
+  "Setup global exception handler to show error notifications."
+  [frame]
+  (Thread/setDefaultUncaughtExceptionHandler
+   (reify Thread$UncaughtExceptionHandler
+     (uncaughtException [_ thread throwable]
+       (log/error :uncaught-exception
+                  :thread (.getName thread)
+                  :exception (.getMessage throwable)
+                  :stacktrace (with-out-str (.printStackTrace throwable)))
+       (sf/notify-error! frame "⚠️ Error occurred! Check logs.")))))
+
 (defn -main [& args]
   (log/info :bd-viewer/starting)
 
@@ -32,25 +44,31 @@
   ;; 2. Create and show UI
   (let [frame (ui/create-main-frame)]
 
-    ;; 3. Setup reactive watchers with swing-fx (after UI exists!)
+    ;; 3. Setup global exception handler
+    (setup-exception-handler! frame)
+
+    ;; 4. Setup reactive watchers with swing-fx (after UI exists!)
     (fx/setup-watchers! frame)
 
-    ;; 4. Setup keyboard shortcuts (after UI exists!)
+    ;; 5. Setup keyboard shortcuts (after UI exists!)
     (kbd/setup-keyboard-shortcuts! frame)
 
-    ;; 5. Register keyboard shortcuts to reload automatically on Cmd+Shift+R
+    ;; 6. Register keyboard shortcuts to reload automatically on Cmd+Shift+R
+    ;; IMPORTANT: Use resolve to get fresh function on each reload!
     ;; This hook will be called automatically by rebuild-ui! via sf/reload!
-    (sf/register-reload-hook! kbd/setup-keyboard-shortcuts!)
+    (sf/register-reload-hook!
+     (fn [frame]
+       ((resolve 'bd-viewer.keyboard/setup-keyboard-shortcuts!) frame)))
 
-    ;; 6. Add state dump watcher for debugging
+    ;; 7. Add state dump watcher for debugging
     (add-watch db/*app-state ::dump-state
                (fn [_ _ old-state new-state]
                  (dump-state-to-file!)))
 
-    ;; 6. Initial state dump
+    ;; 8. Initial state dump
     (dump-state-to-file!)
 
-    ;; 7. Select first issue if there are any issues
+    ;; 9. Select first issue if there are any issues
     ;; This will trigger watchers which will populate the UI
     (when (seq (:issues @db/*app-state))
       (db/select-issue-by-index 0)))

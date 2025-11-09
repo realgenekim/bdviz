@@ -210,6 +210,45 @@ Watch an atom path and run handler on EDT when value changes.
 - Third-party library initialization
 - Any setup that depends on fresh code
 
+### `notify!` and `notify-error!`
+
+Show toast-style notifications to give users feedback.
+
+```clojure
+;; Success notification (green, 3 seconds)
+(sf/notify! frame "Issues reloaded!")
+(sf/notify! frame "Issue bd-viewer-5 closed!")
+
+;; Error notification (red, 5 seconds)
+(sf/notify-error! frame "⚠️ Error occurred! Check logs.")
+(sf/notify-error! frame "Failed to load issues")
+```
+
+**Features:**
+- ✅ **Non-blocking** - Appears at top-right, auto-hides
+- ✅ **Smart stacking** - New notifications replace old ones (no pile-up)
+- ✅ **Color-coded** - Green for success, red for errors
+- ✅ **Timed** - Success notifications hide after 3s, errors after 5s
+
+**Example: Global exception handler**
+
+Catch all uncaught exceptions and show error notifications:
+
+```clojure
+(defn setup-exception-handler! [frame]
+  (Thread/setDefaultUncaughtExceptionHandler
+   (reify Thread$UncaughtExceptionHandler
+     (uncaughtException [_ thread throwable]
+       (log/error :uncaught-exception
+                  :message (.getMessage throwable))
+       (sf/notify-error! frame "⚠️ Error occurred! Check logs.")))))
+
+;; Call in -main after creating frame
+(setup-exception-handler! frame)
+```
+
+Now any crash will show a red notification instead of silently failing!
+
 ## Why This Pattern Works
 
 ### 1. Hot Reload

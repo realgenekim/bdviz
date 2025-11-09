@@ -156,10 +156,10 @@
 ;; Notifications
 ;; ============================================================================
 
-(defonce ^:private notification-timer (atom nil))
+(defonce ^:private notification-state (atom {:timer nil :window nil}))
 
 (defn notify!
-  "Show a toast-style notification in the upper right corner of the frame.
+  "Show a toast-style notification at the top right of the frame.
   Auto-hides after 3 seconds.
 
   Examples:
@@ -169,9 +169,12 @@
   [frame message]
   (invoke-later
    (fn []
-     ;; Cancel existing timer if any
-     (when-let [timer @notification-timer]
-       (.stop timer))
+     ;; Hide and dispose old notification if any
+     (let [{:keys [timer window]} @notification-state]
+       (when timer (.stop timer))
+       (when window
+         (.setVisible window false)
+         (.dispose window)))
 
      ;; Create notification window
      (let [window (JWindow. frame)
@@ -179,18 +182,18 @@
                    (.setFont (Font. Font/SANS_SERIF Font/BOLD 14))
                    (.setForeground Color/WHITE)
                    (.setOpaque true)
-                   (.setBackground (Color. 0 0 0 200)) ; Semi-transparent black
+                   (.setBackground (Color. 34 139 34)) ; Green background
                    (.setBorder (javax.swing.BorderFactory/createEmptyBorder 10 20 10 20)))]
 
        ;; Setup window
        (.add (.getContentPane window) label BorderLayout/CENTER)
        (.pack window)
 
-       ;; Position in upper right corner
+       ;; Position at top right (flush with top and right edges)
        (let [frame-bounds (.getBounds frame)
              window-width (.getWidth window)
-             x (+ (.x frame-bounds) (- (.width frame-bounds) window-width 20))
-             y (+ (.y frame-bounds) 50)]
+             x (+ (.x frame-bounds) (- (.width frame-bounds) window-width))
+             y (.y frame-bounds)]
          (.setLocation window x y))
 
        ;; Show window
@@ -201,10 +204,62 @@
                            (reify java.awt.event.ActionListener
                              (actionPerformed [_ _]
                                (.setVisible window false)
-                               (.dispose window))))]
+                               (.dispose window)
+                               (reset! notification-state {:timer nil :window nil}))))]
          (.setRepeats timer false)
          (.start timer)
-         (reset! notification-timer timer))))))
+         (reset! notification-state {:timer timer :window window}))))))
+
+(defn notify-error!
+  "Show a red error notification at the top right of the frame.
+  Auto-hides after 5 seconds (longer than success notifications).
+
+  Examples:
+    (notify-error! frame \"Error: Failed to load issues\")
+    (notify-error! frame \"Exception occurred! Check logs.\")"
+  [frame message]
+  (invoke-later
+   (fn []
+     ;; Hide and dispose old notification if any
+     (let [{:keys [timer window]} @notification-state]
+       (when timer (.stop timer))
+       (when window
+         (.setVisible window false)
+         (.dispose window)))
+
+     ;; Create notification window
+     (let [window (JWindow. frame)
+           label (doto (JLabel. message)
+                   (.setFont (Font. Font/SANS_SERIF Font/BOLD 14))
+                   (.setForeground Color/WHITE)
+                   (.setOpaque true)
+                   (.setBackground (Color. 220 20 60)) ; Crimson red background
+                   (.setBorder (javax.swing.BorderFactory/createEmptyBorder 10 20 10 20)))]
+
+       ;; Setup window
+       (.add (.getContentPane window) label BorderLayout/CENTER)
+       (.pack window)
+
+       ;; Position at top right (flush with top and right edges)
+       (let [frame-bounds (.getBounds frame)
+             window-width (.getWidth window)
+             x (+ (.x frame-bounds) (- (.width frame-bounds) window-width))
+             y (.y frame-bounds)]
+         (.setLocation window x y))
+
+       ;; Show window
+       (.setVisible window true)
+
+       ;; Auto-hide after 5 seconds (longer for errors)
+       (let [timer (Timer. 5000
+                           (reify java.awt.event.ActionListener
+                             (actionPerformed [_ _]
+                               (.setVisible window false)
+                               (.dispose window)
+                               (reset! notification-state {:timer nil :window nil}))))]
+         (.setRepeats timer false)
+         (.start timer)
+         (reset! notification-state {:timer timer :window window}))))))
 
 ;; ============================================================================
 ;; Hot Reload Hooks
