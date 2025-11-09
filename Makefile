@@ -1,5 +1,7 @@
+DIR ?= .
+
 run:
-	clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core 2>&1 | tee 00LOGS.txt
+	BD_VIEWER_DIR=$(DIR) clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core 2>&1 | tee 00LOGS.txt
 
 runtests-once:
 	@echo "Checking compilation..."
@@ -26,12 +28,13 @@ clean:
 # Help
 help:
 	@echo "Available commands:"
-	@echo "  make run           - Run bd-viewer"
-	@echo "  make runtests-once - Check compilation"
-	@echo "  make nrepl         - Start nREPL server (auto-port, writes to .nrepl-port)"
-	@echo "  make mcp-configure - Configure MCP server in Claude Code"
-	@echo "  make mcp-run       - Run MCP server (reads port from .nrepl-port)"
-	@echo "  make clean         - Clean compiled artifacts"
-	@echo "  make help          - Show this help"
+	@echo "  make run                          - Run bd-viewer in current directory"
+	@echo "  make run DIR=../slack-retriever   - Run bd-viewer for a different project"
+	@echo "  make runtests-once                - Check compilation"
+	@echo "  make nrepl                        - Start nREPL server (auto-port, writes to .nrepl-port)"
+	@echo "  make mcp-configure                - Configure MCP server in Claude Code"
+	@echo "  make mcp-run                      - Run MCP server (reads port from .nrepl-port)"
+	@echo "  make clean                        - Clean compiled artifacts"
+	@echo "  make help                         - Show this help"
 
 .PHONY: run runtests-once nrepl mcp-configure mcp-run clean help

@@ -47,12 +47,16 @@
 
 (defn load-issues-from-bd
   "Shell out to 'bd list --json' and parse results.
-  Returns vector of ClosedRecord-wrapped issues."
+  Returns vector of ClosedRecord-wrapped issues.
+
+  Respects BD_VIEWER_DIR environment variable to run bd in a specific directory."
   []
   (log/info :load-issues-from-bd :start true)
   (try
-    (let [result (shell/sh "bd" "list" "--json")
+    (let [target-dir (or (System/getenv "BD_VIEWER_DIR") ".")
+          result (shell/sh "bd" "list" "--json" :dir target-dir)
           exit-code (:exit result)]
+      (log/info :load-issues-from-bd :target-dir target-dir)
       (if (zero? exit-code)
         (let [raw-output (:out result)
               ;; Handle both array response and null (empty)
