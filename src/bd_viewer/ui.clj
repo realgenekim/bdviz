@@ -4,7 +4,10 @@
             [swing-fx.core :as sf]
             [bd-viewer.db :as db]
             [bd-viewer.events :as events]
-            [bd-viewer.ui.graph-tab2 :as graph-tab] ; Using Mermaid instead of GraphStream!
+            [bd-viewer.ui.graph-tab2 :as graph-tab] ; Mermaid PNG
+            [bd-viewer.ui.graph-tab-ascii :as graph-ascii] ; ASCII tree
+            [bd-viewer.ui.graph-tab-jtextpane :as graph-html] ; Clickable HTML
+            [bd-viewer.ui.graph-tab-svg :as graph-svg] ; Interactive SVG
             [taoensso.timbre :as log])
   (:import [java.awt Font Dimension]))
 
@@ -94,16 +97,28 @@
 (defn create-content []
   "Create the UI content with tabs.
   Tab 1: Issues list (original UI)
-  Tab 2: Dependency graph visualization"
+  Tab 2: Dependency graph (Mermaid PNG - original)
+  Tab 3: ASCII Tree (instant, text-based)
+  Tab 4: Clickable Tree (HTML with links)
+  Tab 5: Interactive SVG (zoomable/pannable)"
   (s/tabbed-panel
-   :id :content ; ID for easy selection when rebuilding graph tab
+   :id :content ; ID for easy selection when rebuilding graph tabs
    :placement :top
    :tabs [{:title "📋 Issues"
-           :tip "List view of all issues"
+           :tip "List view of all issues with filtering and search"
            :content (create-issues-tab)}
-          {:title "🕸️  Graph"
-           :tip "Dependency graph visualization"
-           :content (graph-tab/create-graph-panel)}]))
+          {:title "🕸️  Graph (PNG)"
+           :tip "Mermaid dependency graph (static image)"
+           :content (graph-tab/create-graph-panel)}
+          {:title "📝 ASCII Tree"
+           :tip "Fast text-based tree view (instant rendering)"
+           :content (graph-ascii/create-graph-panel)}
+          {:title "🔗 Clickable Tree"
+           :tip "HTML tree with clickable issue links"
+           :content (graph-html/create-graph-panel)}
+          {:title "⚡ SVG Interactive"
+           :tip "Zoomable/pannable vector graphics (scroll to zoom, drag to pan)"
+           :content (graph-svg/create-graph-panel)}]))
 
 ;; ============================================================================
 ;; Event Wiring
@@ -241,19 +256,21 @@
            (log/info :rebuild-ui! :success true)))))))
 
 (defn rebuild-graph-tab!
-  "Rebuild the graph tab with fresh data.
+  "Rebuild all graph tabs with fresh data.
   
-  Called when Cmd+R is pressed to reload dependencies and re-render the graph."
+  Called when Cmd+R is pressed to reload dependencies and re-render all graphs."
   []
   (when-let [frame @*frame]
     (sf/invoke-later
      (fn []
        (log/info :rebuild-graph-tab! :start true)
-       (let [tabs (s/select frame [:#content])
-             new-graph-panel (graph-tab/create-graph-panel)]
-         ;; Replace graph tab (index 1)
-         (.setComponentAt tabs 1 new-graph-panel)
-         (log/info :rebuild-graph-tab! :success true))))))
+       (let [tabs (s/select frame [:#content])]
+         ;; Rebuild all graph tabs with fresh data
+         (.setComponentAt tabs 1 (graph-tab/create-graph-panel)) ; PNG
+         (.setComponentAt tabs 2 (graph-ascii/create-graph-panel)) ; ASCII
+         (.setComponentAt tabs 3 (graph-html/create-graph-panel)) ; Clickable
+         (.setComponentAt tabs 4 (graph-svg/create-graph-panel)) ; SVG
+         (log/info :rebuild-graph-tab! :success true :tabs-rebuilt 4))))))
 
 ;; ============================================================================
 ;; Main Frame Creation

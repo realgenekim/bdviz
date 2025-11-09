@@ -94,7 +94,13 @@
     (let [url-str (mermaid->image-url mermaid-str :width width)
           url (URL. url-str)]
       (log/info :fetch-diagram-image :fetching-from url-str)
-      (ImageIO/read url))
+      (let [img (ImageIO/read url)]
+        (when img
+          (log/info :fetch-diagram-image
+                    :success true
+                    :width (.getWidth img)
+                    :height (.getHeight img)))
+        img))
     (catch Exception e
       (log/error :fetch-diagram-image :exception (.getMessage e))
       nil)))

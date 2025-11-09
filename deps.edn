@@ -16,6 +16,11 @@
         org.graphstream/gs-core {:mvn/version "2.0"}
         org.graphstream/gs-ui-swing {:mvn/version "2.0"}
 
+        ; Apache Batik for SVG rendering
+        org.apache.xmlgraphics/batik-swing {:mvn/version "1.17"}
+        org.apache.xmlgraphics/batik-codec {:mvn/version "1.17"}
+        org.apache.xmlgraphics/batik-transcoder {:mvn/version "1.17"}
+
         ; Logging
         genek/logging {:local/root "../logging"}
         com.taoensso/timbre {:mvn/version "6.6.1"}
