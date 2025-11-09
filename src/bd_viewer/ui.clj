@@ -243,40 +243,53 @@
 ;; Main Frame Creation
 ;; ============================================================================
 
-(defn create-main-frame []
+(defn create-main-frame
   "Create and show the main application window.
   Uses defonce *frame atom for hot reload support.
   
+  Arguments:
+  - initial-tab: :list or :graph (default :list)
+  
   On first call: Creates frame, builds UI, shows window
   On subsequent calls: Returns existing frame (already visible)"
-  (if @*frame
-    @*frame ; Frame already exists
-    (let [target-dir (db/get-target-dir)
-          title (str "BD Viewer - " target-dir)
-          frame (s/frame :title title
-                         :size [1250 :by 700]
-                         :on-close :exit)]
-      (reset! *frame frame)
+  ([]
+   (create-main-frame :list))
+  ([initial-tab]
+   (if @*frame
+     @*frame ; Frame already exists
+     (let [target-dir (db/get-target-dir)
+           title (str "BD Viewer - " target-dir)
+           frame (s/frame :title title
+                          :size [1250 :by 700]
+                          :on-close :exit)]
+       (reset! *frame frame)
 
-      ;; Build initial UI using rebuild-ui! so same code path
-      ;; Create content
-      (let [content (create-content)]
-        (.add (.getContentPane frame) content java.awt.BorderLayout/CENTER))
+       ;; Build initial UI using rebuild-ui! so same code path
+       ;; Create content
+       (let [content (create-content)
+             ;; Set initial tab BEFORE adding to frame
+             tab-index (case initial-tab
+                         :graph 1
+                         :list 0
+                         0)]
+         (.setSelectedIndex content tab-index)
+         (.add (.getContentPane frame) content java.awt.BorderLayout/CENTER))
 
-      ;; Wire up event handlers
-      (wire-events! frame)
+       ;; Wire up event handlers
+       (wire-events! frame)
 
-      ;; Store UI references
-      (store-ui-refs! frame)
+       ;; Store UI references
+       (store-ui-refs! frame)
 
-      ;; Show window
-      (s/show! frame)
+       ;; Show window
+       (s/show! frame)
 
-      ;; Set initial focus to the issue list (not search bar)
-      ;; This allows j/k navigation to work immediately!
-      (sf/invoke-later
-       (fn []
-         (.requestFocusInWindow (s/select frame [:#issue-list]))))
+       ;; Set initial focus to the issue list (not search bar)
+       ;; This allows j/k navigation to work immediately!
+       (when (= initial-tab :list)
+         (sf/invoke-later
+          (fn []
+            (.requestFocusInWindow (s/select frame [:#issue-list])))))
 
-      (log/info :create-main-frame :success true :target-dir target-dir)
-      frame)))
+       (log/info :create-main-frame :success true :target-dir target-dir :initial-tab initial-tab)
+       frame))))

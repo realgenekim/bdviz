@@ -9,8 +9,11 @@
   (:require [seesaw.core :as s]
             [bd-viewer.db :as db]
             [bd-viewer.beads.sqlite :as beads-db]
-            [taoensso.timbre :as log])
+            [taoensso.timbre :as log]
+            [clojure.java.io :as io])
   (:import [java.awt Font BorderLayout]
+           [java.awt.image BufferedImage]
+           [javax.imageio ImageIO]
            [org.graphstream.graph.implementations SingleGraph]
            [org.graphstream.ui.swing_viewer SwingViewer]
            [org.graphstream.ui.view Viewer Viewer$ThreadingModel]
@@ -21,76 +24,38 @@
   (.setAttribute element attr-name (into-array Object [value])))
 
 (defn create-test-graph []
-  "Create a graph with hardcoded test data simulating Beads issues.
+  "MINIMAL TEST: Just 2 nodes and 1 edge to debug edge rendering."
+  (let [graph (SingleGraph. "minimal-test")]
 
-  This demonstrates the graph structure we'll use for real data:
-  - Epic node (purple, large)
-  - Task nodes (colored by status)
-  - Directed edges showing dependencies"
-  (let [graph (SingleGraph. "beads-test")]
-
-    ;; Create epic node
-    (doto (.addNode graph "epic-001")
-      (set-attr! "ui.label" "epic-001\nEpic: Auth System")
-      (set-attr! "ui.class" "epic"))
-
-    ;; Create task nodes with different statuses
-    (doto (.addNode graph "task-001")
-      (set-attr! "ui.label" "task-001\nTask: Login UI")
-      (set-attr! "ui.class" "inprogress"))
-
-    (doto (.addNode graph "task-002")
-      (set-attr! "ui.label" "task-002\nTask: Database")
-      (set-attr! "ui.class" "blocked"))
-
-    (doto (.addNode graph "task-003")
-      (set-attr! "ui.label" "task-003\nTask: Testing")
+    ;; Create just 2 nodes
+    (doto (.addNode graph "node-1")
+      (set-attr! "ui.label" "Node 1")
       (set-attr! "ui.class" "open"))
 
-    (doto (.addNode graph "task-004")
-      (set-attr! "ui.label" "task-004\nTask: Deploy")
-      (set-attr! "ui.class" "closed"))
+    (doto (.addNode graph "node-2")
+      (set-attr! "ui.label" "Node 2")
+      (set-attr! "ui.class" "blocked"))
 
-    ;; Add edges showing relationships
-    (.addEdge graph "e1" "epic-001" "task-001" true) ; epic -> task-001
-    (.addEdge graph "e2" "epic-001" "task-002" true) ; epic -> task-002
-    (.addEdge graph "e3" "task-001" "task-002" true) ; task-001 blocks task-002
-    (.addEdge graph "e4" "task-002" "task-003" true) ; task-002 blocks task-003
-    (.addEdge graph "e5" "epic-001" "task-004" true) ; epic -> task-004
+    ;; Add ONE edge
+    (.addEdge graph "edge-1-2" "node-1" "node-2" true)
 
-    ;; Apply stylesheet for colors and sizing
+    ;; Apply stylesheet
     (set-attr! graph "ui.stylesheet"
                "node {
-                  size: 30px;
+                  size: 50px;
                   fill-color: gray;
-                  text-size: 42;
-                  text-style: bold;
-                  text-alignment: under;
-                  stroke-mode: plain;
-                  stroke-color: black;
-                  stroke-width: 2px;
-                }
-                node.epic {
-                  fill-color: #9B59B6;
-                  size: 45px;
-                  text-size: 48;
+                  text-size: 24;
                   text-style: bold;
                 }
                 node.open {
                   fill-color: #2ECC71;
                 }
-                node.inprogress {
-                  fill-color: #F39C12;
-                }
                 node.blocked {
                   fill-color: #E74C3C;
                 }
-                node.closed {
-                  fill-color: #95A5A6;
-                }
                 edge {
-                  fill-color: #7F8C8D;
-                  arrow-size: 8px, 6px;
+                  fill-color: #000000;
+                  size: 5px;
                 }")
 
     graph))
@@ -120,6 +85,42 @@
     "closed" "closed"
     "default"))
 
+(defn format-node-label
+  "Format node label to show meaningful task context.
+  Format: #15 Phase 4: Interact..."
+  [id title]
+  (let [id-num (or (re-find #"\d+$" id) id)
+        ;; Take first 20 chars of title for context
+        short-title (subs title 0 (min 20 (count title)))]
+    (str "#" id-num " " short-title)))
+
+(def graph-style
+  "Graph styling configuration - simple and clean!"
+  {:node {:size 50
+          :fill-color "gray"
+          :text-size 24
+          :text-style "bold"}
+   :node-open {:fill-color "#2ECC71"}
+   :node-blocked {:fill-color "#E74C3C"}
+   :edge {:fill-color "#000000"
+          :size 5}})
+
+(defn style-map->css
+  "Convert style map to GraphStream CSS string."
+  [style-map]
+  (letfn [(css-entry [[k v]]
+            (str "  " (name k) ": " v (when (number? v) "px") ";"))
+          (css-block [selector styles]
+            (str selector " {\n"
+                 (clojure.string/join "\n" (map css-entry styles))
+                 "\n}"))]
+    (clojure.string/join "\n"
+                         (remove nil?
+                                 [(css-block "node" (:node style-map))
+                                  (when (:node-open style-map) (css-block "node.open" (:node-open style-map)))
+                                  (when (:node-blocked style-map) (css-block "node.blocked" (:node-blocked style-map)))
+                                  (css-block "edge" (:edge style-map))]))))
+
 (defn create-graph-from-issues [issues]
   "Create a GraphStream graph from real Beads issues.
 
@@ -134,11 +135,11 @@
     ;; Add nodes for all issues
     (doseq [issue issues]
       (let [node (.addNode graph (:id issue))
-            issue-type (:issue-type issue) ; kebab-case from ClosedRecord
+            issue-type (:issue-type issue)
             status (:status issue)
             title (:title issue)]
-        ;; Set label with ID and truncated title
-        (set-attr! node "ui.label" (str (:id issue) "\n" (subs title 0 (min 30 (count title)))))
+        ;; Set label - just the issue number
+        (set-attr! node "ui.label" (format-node-label (:id issue) title))
         ;; Set CSS class based on status or type
         (set-attr! node "ui.class"
                    (if (= "epic" issue-type)
@@ -152,19 +153,9 @@
       (doseq [{:keys [issue-id depends-on-id type]} dependencies]
         (let [from-node (.getNode graph depends-on-id)
               to-node (.getNode graph issue-id)]
-          (log/info :create-graph-from-issues/edge-check
-                    :issue-id issue-id
-                    :depends-on-id depends-on-id
-                    :from-node (boolean from-node)
-                    :to-node (boolean to-node))
-          ;; Only add edge if both nodes exist in the graph
           (when (and from-node to-node)
             (let [edge-id (str issue-id "->" depends-on-id)
-                  edge (.addEdge graph edge-id depends-on-id issue-id true)] ; directed edge
-              (log/info :create-graph-from-issues/edge-created
-                        :edge-id edge-id
-                        :type type)
-              ;; Set CSS class based on dependency type
+                  edge (.addEdge graph edge-id depends-on-id issue-id true)]
               (set-attr! edge "ui.class"
                          (case type
                            "blocks" "blocks"
@@ -173,60 +164,64 @@
                            "discovered-from" "discovered"
                            "default")))))))
 
-    ;; Set graph to show edges on top
-
-;; Apply stylesheet with dependency edge styles
-    (set-attr! graph "ui.stylesheet"
-               "node {
-                  size: 30px;
-                  fill-color: gray;
-                  text-size: 42;
-                  text-style: bold;
-                  text-alignment: under;
-                  stroke-mode: plain;
-                  stroke-color: black;
-                  stroke-width: 2px;
-                }
-                node.epic {
-                  fill-color: #9B59B6;
-                  size: 45px;
-                  text-size: 48;
-                  text-style: bold;
-                }
-                node.open {
-                  fill-color: #2ECC71;
-                }
-                node.inprogress {
-                  fill-color: #F39C12;
-                }
-                node.blocked {
-                  fill-color: #E74C3C;
-                }
-                node.closed {
-                  fill-color: #95A5A6;
-                }
-                edge {
-                  fill-color: #7F8C8D;
-                  size: 3px;
-                }
-                edge.blocks {
-                  fill-color: #E74C3C;
-                  size: 5px;
-                }
-                edge.parentchild {
-                  fill-color: #3498DB;
-                  size: 3px;
-                }
-                edge.related {
-                  fill-color: #95A5A6;
-                  size: 2px;
-                }
-                edge.discovered {
-                  fill-color: #2ECC71;
-                  size: 2px;
-                }")
+    ;; Apply stylesheet from Clojure data
+    (set-attr! graph "ui.stylesheet" (style-map->css graph-style))
 
     graph))
+
+(defn save-screenshot!
+  "Save a screenshot of the graph panel to graph.png for debugging."
+  [panel]
+  (try
+    (let [width (.getWidth panel)
+          height (.getHeight panel)
+          image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
+          graphics (.createGraphics image)]
+      (.paint panel graphics)
+      (ImageIO/write image "png" (io/file "graph.png"))
+      (log/info :save-screenshot! :success true :file "graph.png")
+      (.dispose graphics))
+    (catch Exception e
+      (log/error :save-screenshot! :exception (.getMessage e)))))
+
+(defn test-graph-render!
+  "REPL helper: Render graph and save to graph.png.
+  
+  Usage:
+    (require '[bd-viewer.ui.graph-tab :as gt])
+    (require '[bd-viewer.db :as db])
+    (db/init-state!)
+    (gt/test-graph-render!)
+    ;; Check graph.png
+    ;; Adjust sizes, then:
+    (require '[bd-viewer.ui.graph-tab :as gt] :reload)
+    (gt/test-graph-render!)
+  "
+  []
+  (let [issues (:issues @db/*app-state)
+        graph (create-graph-from-issues issues)
+        viewer (org.graphstream.ui.swing_viewer.SwingViewer.
+                graph
+                org.graphstream.ui.view.Viewer$ThreadingModel/GRAPH_IN_GUI_THREAD)
+        view (.addDefaultView viewer false)]
+    (.enableAutoLayout viewer)
+
+    ;; Wait for layout to stabilize
+    (Thread/sleep 2000)
+
+    ;; Create image
+    (let [width 1200
+          height 800
+          image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
+          graphics (.createGraphics image)]
+      (.setSize view (java.awt.Dimension. width height))
+      (.paint view graphics)
+      (ImageIO/write image "png" (io/file "graph.png"))
+      (println "✅ Saved graph.png")
+      (.dispose graphics)
+      (.close viewer))
+
+    :done))
 
 (defn create-graph-panel []
   "Create the graph visualization panel.
@@ -240,11 +235,17 @@
         graph-panel (embed-graph-viewer graph)
         label-text (if (empty? issues)
                      "Dependency Graph (Test Data - No Issues Loaded)"
-                     (str "Dependency Graph (" (count issues) " issues)"))]
+                     (str "Dependency Graph (" (count issues) " issues)"))
+        panel (s/border-panel
+               :north (s/label
+                       :text label-text
+                       :font (Font. Font/SANS_SERIF Font/BOLD 16)
+                       :border 5)
+               :center graph-panel)]
 
-    (s/border-panel
-     :north (s/label
-             :text label-text
-             :font (Font. Font/SANS_SERIF Font/BOLD 16)
-             :border 5)
-     :center graph-panel)))
+    ;; Save screenshot after a delay (let graph layout stabilize)
+    (future
+      (Thread/sleep 2000)
+      (save-screenshot! graph-panel))
+
+    panel))
