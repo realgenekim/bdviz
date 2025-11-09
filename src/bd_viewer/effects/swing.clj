@@ -54,14 +54,19 @@
                      (log/debug :update-search-field! :text new)
                      (s/text! search-field new))))))
 
-  ;; Watch show-open-only toggle - update list
+  ;; Watch show-open-only toggle - update list and tree
   (sf/watch! db/*app-state [:show-open-only]
              (fn [old new]
+               ;; Update issues list
                (when-let [listbox (s/select frame [:#issue-list])]
                  (let [filtered-issues (db/get-filtered-issues)
                        display-items (mapv format-issue-item filtered-issues)]
                    (log/debug :update-open-only-filter! :show-open-only new :count (count filtered-issues))
-                   (s/config! listbox :model display-items)))))
+                   (s/config! listbox :model display-items)))
+
+               ;; Update tree view
+               (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
+                 (refresh-fn))))
 
   ;; Watch selected index - update JList selection
   (sf/watch! db/*app-state [:selected-index]
@@ -74,78 +79,88 @@
                      (.ensureIndexIsVisible listbox new))
                    (.clearSelection listbox)))))
 
-  ;; Watch selected issue - update detail panel
+  ;; Watch selected issue - update detail panels and tree highlighting
   (sf/watch! db/*app-state [:selected-issue]
              (fn [old new]
                (let [issue (when new (db/get-issue-by-id new))]
                  (log/debug :update-detail-panel! :issue-id new :has-issue (some? issue))
 
-                 (if issue
-                   ;; Populate with issue data
-                   (do
-                     (when-let [title-label (s/select frame [:#title-label])]
-                       (s/config! title-label :text (:title issue)))
+                 ;; Helper to update detail panel labels
+                 (letfn [(update-detail-panel! [prefix]
+                           (if issue
+                             ;; Populate with issue data
+                             (do
+                               (when-let [title-label (s/select frame [(keyword (str prefix "title-label"))])]
+                                 (s/config! title-label :text (:title issue)))
 
-                     (when-let [desc-area (s/select frame [:#description-area])]
-                       (s/config! desc-area :text (or (:description issue) "")))
+                               (when-let [desc-area (s/select frame [(keyword (str prefix "description-area"))])]
+                                 (s/config! desc-area :text (or (:description issue) "")))
 
-                     (when-let [id-label (s/select frame [:#id-label])]
-                       (s/config! id-label :text (str "ID: " (:id issue))))
+                               (when-let [id-label (s/select frame [(keyword (str prefix "id-label"))])]
+                                 (s/config! id-label :text (str "ID: " (:id issue))))
 
-                     (when-let [^JLabel status-label (s/select frame [:#status-label])]
-                       (let [status (:status issue)]
-                         (.setText status-label (str "Status: " status))
-                         ;; Color code status
-                         (.setForeground status-label
-                                         (case status
-                                           "open" (Color. 34 139 34) ; Forest green
-                                           "in-progress" (Color. 255 140 0) ; Dark orange
-                                           "closed" (Color. 128 128 128) ; Gray
-                                           Color/BLACK))))
+                               (when-let [^JLabel status-label (s/select frame [(keyword (str prefix "status-label"))])]
+                                 (let [status (:status issue)]
+                                   (.setText status-label (str "Status: " status))
+                                   ;; Color code status
+                                   (.setForeground status-label
+                                                   (case status
+                                                     "open" (Color. 34 139 34) ; Forest green
+                                                     "in-progress" (Color. 255 140 0) ; Dark orange
+                                                     "closed" (Color. 128 128 128) ; Gray
+                                                     Color/BLACK))))
 
-                     (when-let [priority-label (s/select frame [:#priority-label])]
-                       (s/config! priority-label
-                                  :text (str "Priority: " (db/priority-label (:priority issue)))))
+                               (when-let [priority-label (s/select frame [(keyword (str prefix "priority-label"))])]
+                                 (s/config! priority-label
+                                            :text (str "Priority: " (db/priority-label (:priority issue)))))
 
-                     (when-let [type-label (s/select frame [:#type-label])]
-                       (s/config! type-label
-                                  :text (str "Type: " (:issue-type issue))))
+                               (when-let [type-label (s/select frame [(keyword (str prefix "type-label"))])]
+                                 (s/config! type-label
+                                            :text (str "Type: " (:issue-type issue))))
 
-                     (when-let [labels-label (s/select frame [:#labels-label])]
-                       (let [labels (:labels issue)]
-                         (s/config! labels-label
-                                    :text (if (seq labels)
-                                            (str "Labels: " (clojure.string/join ", " labels))
-                                            "Labels: none"))))
+                               (when-let [labels-label (s/select frame [(keyword (str prefix "labels-label"))])]
+                                 (let [labels (:labels issue)]
+                                   (s/config! labels-label
+                                              :text (if (seq labels)
+                                                      (str "Labels: " (clojure.string/join ", " labels))
+                                                      "Labels: none"))))
 
-                     (when-let [created-label (s/select frame [:#created-label])]
-                       (s/config! created-label
-                                  :text (str "Created: " (:created-at issue))))
+                               (when-let [created-label (s/select frame [(keyword (str prefix "created-label"))])]
+                                 (s/config! created-label
+                                            :text (str "Created: " (:created-at issue))))
 
-                     (when-let [updated-label (s/select frame [:#updated-label])]
-                       (s/config! updated-label
-                                  :text (str "Updated: " (:updated-at issue)))))
+                               (when-let [updated-label (s/select frame [(keyword (str prefix "updated-label"))])]
+                                 (s/config! updated-label
+                                            :text (str "Updated: " (:updated-at issue)))))
 
-                   ;; No issue selected - clear everything
-                   (do
-                     (when-let [title-label (s/select frame [:#title-label])]
-                       (s/config! title-label :text "No issue selected"))
-                     (when-let [desc-area (s/select frame [:#description-area])]
-                       (s/config! desc-area :text ""))
-                     (when-let [id-label (s/select frame [:#id-label])]
-                       (s/config! id-label :text ""))
-                     (when-let [status-label (s/select frame [:#status-label])]
-                       (s/config! status-label :text ""))
-                     (when-let [priority-label (s/select frame [:#priority-label])]
-                       (s/config! priority-label :text ""))
-                     (when-let [type-label (s/select frame [:#type-label])]
-                       (s/config! type-label :text ""))
-                     (when-let [labels-label (s/select frame [:#labels-label])]
-                       (s/config! labels-label :text ""))
-                     (when-let [created-label (s/select frame [:#created-label])]
-                       (s/config! created-label :text ""))
-                     (when-let [updated-label (s/select frame [:#updated-label])]
-                       (s/config! updated-label :text "")))))))
+                             ;; No issue selected - clear everything
+                             (do
+                               (when-let [title-label (s/select frame [(keyword (str prefix "title-label"))])]
+                                 (s/config! title-label :text "No issue selected"))
+                               (when-let [desc-area (s/select frame [(keyword (str prefix "description-area"))])]
+                                 (s/config! desc-area :text ""))
+                               (when-let [id-label (s/select frame [(keyword (str prefix "id-label"))])]
+                                 (s/config! id-label :text ""))
+                               (when-let [status-label (s/select frame [(keyword (str prefix "status-label"))])]
+                                 (s/config! status-label :text ""))
+                               (when-let [priority-label (s/select frame [(keyword (str prefix "priority-label"))])]
+                                 (s/config! priority-label :text ""))
+                               (when-let [type-label (s/select frame [(keyword (str prefix "type-label"))])]
+                                 (s/config! type-label :text ""))
+                               (when-let [labels-label (s/select frame [(keyword (str prefix "labels-label"))])]
+                                 (s/config! labels-label :text ""))
+                               (when-let [created-label (s/select frame [(keyword (str prefix "created-label"))])]
+                                 (s/config! created-label :text ""))
+                               (when-let [updated-label (s/select frame [(keyword (str prefix "updated-label"))])]
+                                 (s/config! updated-label :text "")))))]
+
+                   ;; Update both detail panels (issues tab and tree tab)
+                   (update-detail-panel! "#")
+                   (update-detail-panel! "#tree-")
+
+                   ;; Refresh tree view to highlight selected issue
+                   (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
+                     (refresh-fn))))))
 
   ;; IMPORTANT: Do initial population on EDT!
   ;; Watchers only fire on changes, so we need to manually populate initially

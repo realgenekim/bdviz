@@ -8,6 +8,7 @@
             [bd-viewer.ui.graph-tab-ascii :as graph-ascii] ; ASCII tree
             [bd-viewer.ui.graph-tab-jtextpane :as graph-html] ; Clickable HTML
             [bd-viewer.ui.graph-tab-svg :as graph-svg] ; Interactive SVG
+            [bd-viewer.ui.tree-view :as tree-view] ; Tree view component
             [taoensso.timbre :as log])
   (:import [java.awt Font Dimension]))
 
@@ -96,15 +97,58 @@
 
 (defn create-content []
   "Create the UI content with tabs.
-  Tab 1: Issues list (original UI)
-  Tab 2: Dependency graph (Mermaid PNG - original)
-  Tab 3: ASCII Tree (instant, text-based)
-  Tab 4: Clickable Tree (HTML with links)
-  Tab 5: Interactive SVG (zoomable/pannable)"
+  Tab 1: Tree View (NEW - tree on left, details on right)
+  Tab 2: Issues list (original UI)
+  Tab 3: Dependency graph (Mermaid PNG - original)
+  Tab 4: ASCII Tree (instant, text-based)
+  Tab 5: Clickable Tree (HTML with links)
+  Tab 6: SVG Interactive (DISABLED - Batik errors)"
   (s/tabbed-panel
    :id :content ; ID for easy selection when rebuilding graph tabs
    :placement :top
-   :tabs [{:title "📋 Issues"
+   :tabs [{:title "🌲 Tree View"
+           :tip "Tree view with details pane (j/k navigation)"
+           :content (s/left-right-split
+                     ;; Left: Tree view
+                     (tree-view/create-tree-view)
+
+                     ;; Right: Detail panel (same as issues tab)
+                     (s/border-panel
+                      :id :tree-detail-panel
+                      :border [10 10 10 10]
+                      :minimum-size [200 :by 400]
+
+                      ;; Title at top
+                      :north (s/label :id :tree-title-label
+                                      :text "No issue selected"
+                                      :font (Font. Font/SANS_SERIF Font/BOLD 20))
+
+                      ;; Description in center
+                      :center (s/scrollable
+                               (s/text :id :tree-description-area
+                                       :multi-line? true
+                                       :editable? false
+                                       :rows 10
+                                       :columns 40
+                                       :wrap-lines? true
+                                       :font (Font. Font/SANS_SERIF Font/PLAIN 14)))
+
+                      ;; Metadata at bottom
+                      :south (s/vertical-panel
+                              :id :tree-metadata-panel
+                              :border [10 10 10 10]
+                              :items [(s/label :id :tree-id-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                      (s/label :id :tree-status-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                      (s/label :id :tree-priority-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                      (s/label :id :tree-type-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                      (s/label :id :tree-labels-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                      (s/label :id :tree-created-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+                                      (s/label :id :tree-updated-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))]))
+
+                     ;; Split settings
+                     :divider-size 8
+                     :resize-weight 0.4)}
+          {:title "📋 Issues"
            :tip "List view of all issues with filtering and search"
            :content (create-issues-tab)}
           {:title "🕸️  Graph (PNG)"
@@ -116,9 +160,10 @@
           {:title "🔗 Clickable Tree"
            :tip "HTML tree with clickable issue links"
            :content (graph-html/create-graph-panel)}
-          {:title "⚡ SVG Interactive"
-           :tip "Zoomable/pannable vector graphics (scroll to zoom, drag to pan)"
-           :content (graph-svg/create-graph-panel)}]))
+          ;; SVG tab disabled due to Batik errors with mermaid.ink SVG
+          #_{:title "⚡ SVG Interactive"
+             :tip "Zoomable/pannable vector graphics (scroll to zoom, drag to pan)"
+             :content (graph-svg/create-graph-panel)}]))
 
 ;; ============================================================================
 ;; Event Wiring
