@@ -1,6 +1,7 @@
 (ns bd-viewer.ui
   "Swing UI components for bd-viewer."
   (:require [seesaw.core :as s]
+            [swing-fx.core :as sf]
             [bd-viewer.db :as db]
             [bd-viewer.events :as events]
             [taoensso.timbre :as log])
@@ -162,7 +163,7 @@
   Call this after (require 'bd-viewer.ui :reload)"
   []
   (when-let [frame @*frame]
-    (s/invoke-later
+    (sf/invoke-later
      (fn []
        (log/info :rebuild-ui! :start true)
 
@@ -204,7 +205,7 @@
 
            ;; Wait a tick then restore selection (triggers watchers)
            (when current-selected
-             (s/invoke-later
+             (sf/invoke-later
               (fn []
                 (swap! db/*app-state assoc
                        :selected-issue current-selected
@@ -245,7 +246,7 @@
 
       ;; Set initial focus to the issue list (not search bar)
       ;; This allows j/k navigation to work immediately!
-      (s/invoke-later
+      (sf/invoke-later
        (fn []
          (.requestFocusInWindow (s/select frame [:#issue-list]))))
 

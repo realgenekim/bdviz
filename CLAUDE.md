@@ -85,6 +85,24 @@ bd list --limit 10
 4. Use `make runtests-once` for compilation checks
 5. Use clojure-mcp for all .clj and .edn file edits
 
+### CRITICAL: Seesaw Function Bugs
+
+**⚠️  DO NOT USE `seesaw.core/invoke-later` or `seesaw.invoke/invoke-later`!**
+
+Seesaw's `invoke-later` has a critical bug where **lambda functions don't execute**. This will silently break your code:
+- Detail panels won't update
+- Hot reload won't work
+- Any EDT operations in lambdas will be silently ignored
+
+**✅ ALWAYS use `swing-fx.core/invoke-later` instead!**
+
+This applies to ALL code in this project. See `swing-fx/src/swing_fx/core.clj` for the full list of broken Seesaw functions and their working replacements.
+
+**Why this matters:**
+- We discovered this bug twice: first when detail panels stopped updating, then when hot reload broke
+- The bug is silent - no errors, just code that doesn't run
+- swing-fx provides fixed wrappers that use Java Swing APIs directly
+
 ### Debugging
 
 - **Logs**: All output from `make run` is saved to `./00LOGS.txt` (automatically via `tee`)

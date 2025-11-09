@@ -167,7 +167,7 @@
     (notify! frame \"Showing all issues\")
     (notify! frame \"Deleted issue bd-viewer-5\")"
   [frame message]
-  (invoke/invoke-later
+  (invoke-later
    (fn []
      ;; Cancel existing timer if any
      (when-let [timer @notification-timer]
