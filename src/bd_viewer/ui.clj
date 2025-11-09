@@ -156,7 +156,8 @@
   2. Creates NEW content from fresh view functions
   3. Re-wires events to new widgets
   4. Re-sets up watchers
-  5. Refreshes display
+  5. Forces state refresh to populate new widgets
+  6. Refreshes display
   
   Call this after (require 'bd-viewer.ui :reload)"
   []
@@ -165,32 +166,51 @@
      (fn []
        (log/info :rebuild-ui! :start true)
 
-       ;; Create fresh content from latest code
-       (let [new-content (create-content)
-             content-pane (.getContentPane frame)]
+       ;; Save current state before rebuild
+       (let [current-selected (:selected-issue @db/*app-state)
+             current-index (:selected-index @db/*app-state)]
 
-         ;; Remove old content
-         (.removeAll content-pane)
+         ;; Create fresh content from latest code
+         (let [new-content (create-content)
+               content-pane (.getContentPane frame)]
 
-         ;; Add new content
-         (.add content-pane new-content java.awt.BorderLayout/CENTER)
+           ;; Remove old content
+           (.removeAll content-pane)
 
-         ;; Re-wire events to new widgets
-         (wire-events! frame)
+           ;; Add new content
+           (.add content-pane new-content java.awt.BorderLayout/CENTER)
 
-         ;; Store UI refs for effects
-         (store-ui-refs! frame)
+           ;; Re-wire events to new widgets
+           (wire-events! frame)
 
-         ;; Re-setup watchers with new widgets
-         ;; Note: This requires requiring effects.swing with :reload too
-         (require 'bd-viewer.effects.swing :reload)
-         ((resolve 'bd-viewer.effects.swing/setup-watchers!) frame)
+           ;; Store UI refs for effects
+           (store-ui-refs! frame)
 
-         ;; Refresh display
-         (.validate frame)
-         (.repaint frame)
+           ;; Re-setup watchers with new widgets
+           ;; Note: This requires requiring effects.swing with :reload too
+           (require 'bd-viewer.effects.swing :reload)
+           ((resolve 'bd-viewer.effects.swing/setup-watchers!) frame)
 
-         (log/info :rebuild-ui! :success true))))))
+           ;; Refresh display
+           (.validate frame)
+           (.repaint frame)
+
+           ;; IMPORTANT: Force state refresh to populate new widgets!
+           ;; Watchers only fire on CHANGES, so we need to trigger them
+           ;; by temporarily changing state then restoring it
+           (swap! db/*app-state assoc
+                  :selected-issue nil
+                  :selected-index -1)
+
+           ;; Wait a tick then restore selection (triggers watchers)
+           (when current-selected
+             (s/invoke-later
+              (fn []
+                (swap! db/*app-state assoc
+                       :selected-issue current-selected
+                       :selected-index current-index))))
+
+           (log/info :rebuild-ui! :success true)))))))
 
 ;; ============================================================================
 ;; Main Frame Creation

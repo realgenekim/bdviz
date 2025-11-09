@@ -3,12 +3,42 @@
 
   This library provides utilities for functional Swing:
   - watch! - Explicit watchers with EDT safety
+  - invoke-later - EDT-safe execution wrapper
+  - set-selection! - Set JList selection reliably
   - notify! - Toast-like notifications
 
-  The value isn't in code volume, but in the PATTERN demonstrated by bd-viewer."
-  (:require [seesaw.invoke :as invoke]
-            [seesaw.core :as s])
-  (:import [javax.swing Timer JLabel JWindow]
+  The value isn't in code volume, but in the PATTERN demonstrated by bd-viewer.
+  
+  ═══════════════════════════════════════════════════════════════════════════
+  CRITICAL: Which Seesaw Functions to Use (and NOT Use)
+  ═══════════════════════════════════════════════════════════════════════════
+  
+  ✅ SAFE TO USE (these work correctly):
+     - seesaw.core/select          (find widgets by ID)
+     - seesaw.core/config!         (set widget properties)
+     - seesaw.core/text            (get text from widgets)
+     - seesaw.core/text!           (set text in widgets)
+     - seesaw.core/listen          (add event listeners)
+     - seesaw.core/frame           (create frames)
+     - seesaw.core/button          (create buttons)
+     - seesaw.core/label           (create labels)
+     - seesaw.core/listbox         (create listboxes)
+     - seesaw.core/scrollable      (add scrollbars)
+     - seesaw.core/border-panel    (layout managers)
+     - seesaw.core/horizontal-panel
+     - seesaw.core/vertical-panel
+  
+  ❌ DO NOT USE (these have bugs - use swing-fx alternatives):
+     - seesaw.invoke/invoke-later  → Use swing-fx.core/invoke-later instead!
+     - seesaw.core/selection!      → Use swing-fx.core/set-selection! instead!
+  
+  Why? Seesaw's invoke-later doesn't actually execute lambdas on the EDT,
+  and selection! returns nil without setting the selection. We've verified
+  these bugs through extensive debugging. Use the swing-fx wrappers which
+  call Java Swing APIs directly.
+  ═══════════════════════════════════════════════════════════════════════════"
+  (:require [seesaw.core :as s])
+  (:import [javax.swing Timer JLabel JWindow JList SwingUtilities]
            [java.awt Color Font BorderLayout Dimension]))
 
 (defn watch!
@@ -42,14 +72,85 @@
   - Auto-diff: Only calls handler when value actually changes
   - No magic: No hidden subscriptions or dependency tracking"
   [*atom path handler]
-  (add-watch *atom (gensym "watch-")
-             (fn [_ _ old-state new-state]
-               (let [old-val (get-in old-state path)
-                     new-val (get-in new-state path)]
-                 (when (not= old-val new-val)
-                   (invoke/invoke-later
-                    (fn []
-                      (handler old-val new-val))))))))
+  (let [watch-key (keyword (str "watch-" (hash path)))]
+    (add-watch *atom watch-key
+               (fn [k ref old-state new-state]
+                 (let [old-val (get-in old-state path)
+                       new-val (get-in new-state path)]
+                   (when (not= old-val new-val)
+                     (javax.swing.SwingUtilities/invokeLater
+                      (reify Runnable
+                        (run [_]
+                          (handler old-val new-val))))))))))
+
+;; ============================================================================
+;; EDT-Safe Execution (replaces buggy seesaw.invoke/invoke-later)
+;; ============================================================================
+
+(defn invoke-later
+  "Execute function on the Swing Event Dispatch Thread.
+  
+  ⚠️  DO NOT use seesaw.invoke/invoke-later - it has a bug where lambdas don't execute!
+  ✅  Use this function instead - it uses SwingUtilities/invokeLater directly.
+  
+  Examples:
+    (invoke-later
+      (fn []
+        (s/config! my-label :text \"Updated!\")))
+    
+    ; Or with inline lambda
+    (invoke-later #(println \"On EDT!\"))"
+  [f]
+  (SwingUtilities/invokeLater
+   (reify Runnable
+     (run [_] (f)))))
+
+;; ============================================================================
+;; JList Selection (replaces buggy seesaw.core/selection!)
+;; ============================================================================
+
+(defn set-selection!
+  "Set the selected index in a JList.
+  
+  ⚠️  DO NOT use seesaw.core/selection! - it returns nil without setting selection!
+  ✅  Use this function instead - it uses .setSelectedIndex directly.
+  
+  Examples:
+    ; Select index 0
+    (set-selection! my-listbox 0)
+    
+    ; Clear selection
+    (set-selection! my-listbox nil)
+    
+    ; With auto-scroll
+    (set-selection! my-listbox 5 :scroll true)"
+  ([listbox index]
+   (set-selection! listbox index :scroll false))
+  ([listbox index & {:keys [scroll]}]
+   (let [^JList jlist listbox]
+     (if (nil? index)
+       (.clearSelection jlist)
+       (do
+         (.setSelectedIndex jlist index)
+         (when scroll
+           (.ensureIndexIsVisible jlist index)))))))
+
+(defn get-selection
+  "Get the currently selected index from a JList.
+  
+  Returns the selected index or nil if nothing selected.
+  
+  Examples:
+    (get-selection my-listbox)
+    ;; => 2
+    
+    ; Check if something is selected
+    (when-let [idx (get-selection my-listbox)]
+      (println \"Selected index:\" idx))"
+  [listbox]
+  (let [^JList jlist listbox
+        idx (.getSelectedIndex jlist)]
+    (when (>= idx 0) idx)))
 
 ;; ============================================================================
 ;; Notifications

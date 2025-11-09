@@ -68,11 +68,13 @@
   ;; Watch selected index - update JList selection
   (sf/watch! db/*app-state [:selected-index]
              (fn [old new]
-               (when-let [listbox (s/select frame [:#issue-list])]
+               (when-let [^javax.swing.JList listbox (s/select frame [:#issue-list])]
                  (log/debug :update-selection! :index new)
                  (if (>= new 0)
-                   (s/selection! listbox new)
-                   (s/selection! listbox nil)))))
+                   (do
+                     (.setSelectedIndex listbox new)
+                     (.ensureIndexIsVisible listbox new))
+                   (.clearSelection listbox)))))
 
   ;; Watch selected issue - update detail panel
   (sf/watch! db/*app-state [:selected-issue]
