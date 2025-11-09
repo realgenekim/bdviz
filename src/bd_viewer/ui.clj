@@ -238,7 +238,9 @@
   On subsequent calls: Returns existing frame (already visible)"
   (if @*frame
     @*frame ; Frame already exists
-    (let [frame (s/frame :title "BD Viewer"
+    (let [target-dir (db/get-target-dir)
+          title (str "BD Viewer - " target-dir)
+          frame (s/frame :title title
                          :size [1250 :by 700]
                          :on-close :exit)]
       (reset! *frame frame)
@@ -263,5 +265,5 @@
        (fn []
          (.requestFocusInWindow (s/select frame [:#issue-list]))))
 
-      (log/info :create-main-frame :success true)
+      (log/info :create-main-frame :success true :target-dir target-dir)
       frame)))

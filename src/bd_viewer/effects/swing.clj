@@ -13,6 +13,16 @@
 ;; Watcher Setup with swing-fx
 ;; ============================================================================
 
+(defn format-issue-item
+  "Format an issue for display in the list.
+  Adds '* ' prefix for in-progress issues, '  ' for open/closed."
+  [issue]
+  (let [prefix (if (= "in-progress" (:status issue)) "* " "  ")]
+    (str prefix
+         (:id issue)
+         " [" (db/priority-label (:priority issue)) "] "
+         (:title issue))))
+
 (defn setup-watchers!
   "Register state watchers using swing-fx.
   Each watcher is explicit and EDT-safe automatically!"
@@ -24,11 +34,7 @@
              (fn [old new]
                (when-let [listbox (s/select frame [:#issue-list])]
                  (let [filtered-issues (db/get-filtered-issues)
-                       display-items (mapv (fn [issue]
-                                             (str (:id issue)
-                                                  " [" (db/priority-label (:priority issue)) "] "
-                                                  (:title issue)))
-                                           filtered-issues)]
+                       display-items (mapv format-issue-item filtered-issues)]
                    (log/debug :update-issue-list! :count (count filtered-issues))
                    (s/config! listbox :model display-items)))))
 
@@ -37,11 +43,7 @@
              (fn [old new]
                (when-let [listbox (s/select frame [:#issue-list])]
                  (let [filtered-issues (db/get-filtered-issues)
-                       display-items (mapv (fn [issue]
-                                             (str (:id issue)
-                                                  " [" (db/priority-label (:priority issue)) "] "
-                                                  (:title issue)))
-                                           filtered-issues)]
+                       display-items (mapv format-issue-item filtered-issues)]
                    (log/debug :update-filtered-list! :count (count filtered-issues))
                    (s/config! listbox :model display-items)))
 
@@ -57,11 +59,7 @@
              (fn [old new]
                (when-let [listbox (s/select frame [:#issue-list])]
                  (let [filtered-issues (db/get-filtered-issues)
-                       display-items (mapv (fn [issue]
-                                             (str (:id issue)
-                                                  " [" (db/priority-label (:priority issue)) "] "
-                                                  (:title issue)))
-                                           filtered-issues)]
+                       display-items (mapv format-issue-item filtered-issues)]
                    (log/debug :update-open-only-filter! :show-open-only new :count (count filtered-issues))
                    (s/config! listbox :model display-items)))))
 
@@ -155,11 +153,7 @@
    (fn []
      (when-let [listbox (s/select frame [:#issue-list])]
        (let [filtered-issues (db/get-filtered-issues)
-             display-items (mapv (fn [issue]
-                                   (str (:id issue)
-                                        " [" (db/priority-label (:priority issue)) "] "
-                                        (:title issue)))
-                                 filtered-issues)]
+             display-items (mapv format-issue-item filtered-issues)]
          (log/info :initial-population! :count (count filtered-issues))
          (s/config! listbox :model display-items)))))
 

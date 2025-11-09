@@ -9,6 +9,10 @@
   (:import [org.graphstream.graph.implementations SingleGraph]
            [org.graphstream.graph Node Edge]))
 
+;; Helper function: GraphStream's setAttribute requires varargs as Object array
+(defn set-attr! [element attr-name value]
+  (.setAttribute element attr-name (into-array Object [value])))
+
 (deftest graphstream-basic-graph-creation
   (testing "Can create a basic GraphStream graph without errors"
     (let [graph (SingleGraph. "test-graph")]
@@ -66,10 +70,10 @@
     (let [graph (SingleGraph. "test-attrs")
           node (.addNode graph "N1")]
 
-      ;; Set attributes
-      (.setAttribute node "label" "Test Node")
-      (.setAttribute node "status" "open")
-      (.setAttribute node "priority" 1)
+      ;; Set attributes using helper
+      (set-attr! node "label" "Test Node")
+      (set-attr! node "status" "open")
+      (set-attr! node "priority" 1)
 
       ;; Get attributes
       (is (= "Test Node" (.getAttribute node "label")) "Label should match")
@@ -83,9 +87,9 @@
       (.addNode graph "B")
 
       (let [edge (.addEdge graph "AB" "A" "B" true)]
-        ;; Set attributes
-        (.setAttribute edge "type" "blocks")
-        (.setAttribute edge "weight" 5)
+        ;; Set attributes using helper
+        (set-attr! edge "type" "blocks")
+        (set-attr! edge "weight" 5)
 
         ;; Get attributes
         (is (= "blocks" (.getAttribute edge "type")) "Edge type should match")
@@ -101,7 +105,7 @@
       (.addEdge graph "AB" "A" "B" true)
       (.addEdge graph "BC" "B" "C" true)
 
-;; Collect node IDs
+      ;; Collect node IDs
       (let [node-ids (set (map #(.getId %) (iterator-seq (.iterator (.nodes graph)))))]
         (is (= #{"A" "B" "C"} node-ids) "Should have all 3 node IDs"))
 
@@ -114,9 +118,8 @@
     (let [graph (SingleGraph. "test-style")]
       (.addNode graph "A")
 
-      ;; Set stylesheet (this should not throw)
-      (.setAttribute graph "ui.stylesheet"
-                     "node { fill-color: red; size: 20px; }")
+      ;; Set stylesheet using helper
+      (set-attr! graph "ui.stylesheet" "node { fill-color: red; size: 20px; }")
 
       ;; Verify it was set
       (is (string? (.getAttribute graph "ui.stylesheet"))
@@ -127,21 +130,21 @@
     (let [graph (SingleGraph. "beads-test")]
 
       ;; Create epic node
-      (doto (.addNode graph "epic-001")
-        (.setAttribute "ui.label" "Epic: Auth System")
-        (.setAttribute "type" "epic")
-        (.setAttribute "status" "open"))
+      (let [epic (.addNode graph "epic-001")]
+        (set-attr! epic "ui.label" "Epic: Auth System")
+        (set-attr! epic "type" "epic")
+        (set-attr! epic "status" "open"))
 
       ;; Create task nodes
-      (doto (.addNode graph "task-001")
-        (.setAttribute "ui.label" "Task: Login UI")
-        (.setAttribute "type" "task")
-        (.setAttribute "status" "in-progress"))
+      (let [task1 (.addNode graph "task-001")]
+        (set-attr! task1 "ui.label" "Task: Login UI")
+        (set-attr! task1 "type" "task")
+        (set-attr! task1 "status" "in-progress"))
 
-      (doto (.addNode graph "task-002")
-        (.setAttribute "ui.label" "Task: Database")
-        (.setAttribute "type" "task")
-        (.setAttribute "status" "blocked"))
+      (let [task2 (.addNode graph "task-002")]
+        (set-attr! task2 "ui.label" "Task: Database")
+        (set-attr! task2 "type" "task")
+        (set-attr! task2 "status" "blocked"))
 
       ;; Create edges
       (.addEdge graph "e1" "epic-001" "task-001" true)
@@ -171,8 +174,8 @@
       (.addNode graph "node2")
       (.addEdge graph "edge1" "node1" "node2")
 
-      (.addAttribute graph "ui.stylesheet" "node { fill-color: blue; }")
-      (.addAttribute (.getNode graph "node1") "ui.label" "Node 1")
+      (set-attr! graph "ui.stylesheet" "node { fill-color: blue; }")
+      (set-attr! (.getNode graph "node1") "ui.label" "Node 1")
 
       ;; If we got here without exceptions, headless mode works
       (is true "All headless operations completed without errors"))))
@@ -184,8 +187,7 @@
       (.addNode graph "A")
       (.addNode graph "B")
       (.addEdge graph "AB" "A" "B")
-      (.setAttribute graph "ui.stylesheet"
-                     "node { fill-color: red; size: 20px; }")
+      (set-attr! graph "ui.stylesheet" "node { fill-color: red; size: 20px; }")
       (.display graph)
       graph))
 

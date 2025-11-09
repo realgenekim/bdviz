@@ -144,13 +144,19 @@
     issues)) ; Default: no sorting
 
 (defn get-filtered-issues
-  "Get filtered and sorted issues from current state."
+  "Get filtered and sorted issues from current state.
+  Always sorts by issue ID number - oldest first."
   []
   (let [state @*app-state
         issues (:issues state)
         filter-text (:filter-text state)
-        sort-by (:sort-by state)
-        show-open-only (:show-open-only state)]
+        show-open-only (:show-open-only state)
+        ;; Extract numeric part from issue ID for proper numeric sorting
+        extract-number (fn [issue]
+                         (let [id (:id issue)]
+                           (if-let [num-str (re-find #"\d+$" id)]
+                             (Integer/parseInt num-str)
+                             0)))]
     (-> issues
         ;; First filter by open status if needed
         (#(if show-open-only
@@ -158,8 +164,8 @@
             %))
         ;; Then apply text filter
         (filter-issues filter-text)
-        ;; Finally sort
-        (sort-issues sort-by))))
+        ;; Finally sort by numeric issue ID (oldest/lowest first)
+        (#(sort-by extract-number %)))))
 
 ;; ============================================================================
 ;; Selection Helpers (for j/k navigation)
