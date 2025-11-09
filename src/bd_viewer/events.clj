@@ -281,6 +281,20 @@
 (defmethod handle-event ::reload-code
   [_event]
   (log/info ::reload-code :start true)
-  ;; TODO: Implement hot reload - for now just notify
-  (log/info ::reload-code :status "Restart app to see code changes")
-  nil)
+  (try
+    ;; Reload all namespaces with fresh code
+    (require 'bd-viewer.ui :reload)
+    (require 'bd-viewer.events :reload)
+    (require 'bd-viewer.effects.swing :reload)
+    (require 'bd-viewer.keyboard :reload)
+    (require 'bd-viewer.db :reload)
+
+    ;; Rebuild UI with fresh view functions
+    ((resolve 'bd-viewer.ui/rebuild-ui!))
+
+    (log/info ::reload-code :success true)
+    (catch Exception e
+      (log/error ::reload-code
+                 :exception (.getMessage e)
+                 :stacktrace (with-out-str (.printStackTrace e)))
+      nil)))

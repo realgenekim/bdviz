@@ -7,77 +7,80 @@
   (:import [java.awt Font Dimension]))
 
 ;; ============================================================================
+;; Hot Reload Support
+;; ============================================================================
+
+(defonce *frame (atom nil))
+
+;; ============================================================================
 ;; UI Creation with Seesaw
 ;; ============================================================================
 
-(defn create-ui []
-  "Create the main UI using Seesaw's declarative API."
-  (s/frame
-   :title "BD Viewer"
-   :size [1000 :by 700]
-   :on-close :exit
-   :content
-   (s/border-panel
-    :border 5
+(defn create-content []
+  "Create the UI content panel using Seesaw's declarative API.
+  This is a PURE function - returns fresh widgets every time it's called.
+  Called once at startup, and again on hot reload!"
+  (s/border-panel
+   :border 5
 
-      ;; Top: Search bar and toolbar
-    :north (s/border-panel
-            :border [5 5 5 5]
-            :west (s/label " Search: ")
-            :center (s/text :id :search-field
-                            :columns 30
-                            :font (Font. Font/SANS_SERIF Font/PLAIN 14))
-            :east (s/horizontal-panel
-                   :items [(s/button :id :reload-code-btn
-                                     :text "Reload Code (⌘⇧R)")
-                           (s/button :id :reload-btn
-                                     :text "Reload (⌘R)")
-                           (s/button :id :delete-btn
-                                     :text "Delete (⌘D)")]))
+     ;; Top: Search bar and toolbar
+   :north (s/border-panel
+           :border [5 5 5 5]
+           :west (s/label " Search: ")
+           :center (s/text :id :search-field
+                           :columns 30
+                           :font (Font. Font/SANS_SERIF Font/PLAIN 14))
+           :east (s/horizontal-panel
+                  :items [(s/button :id :reload-code-btn
+                                    :text "Reload Code (⌘⇧R)")
+                          (s/button :id :reload-btn
+                                    :text "Reload (⌘R)")
+                          (s/button :id :delete-btn
+                                    :text "Delete (⌘D)")]))
 
-      ;; Center: Split pane with issue list and detail panel
-    :center (s/left-right-split
-                ;; Left: Issue list
-             (s/scrollable
-              (s/listbox :id :issue-list
-                         :font (Font. Font/MONOSPACED Font/PLAIN 12)
-                         :selection-mode :single)
-              :preferred-size [400 :by 600])
+     ;; Center: Split pane with issue list and detail panel
+   :center (s/left-right-split
+               ;; Left: Issue list
+            (s/scrollable
+             (s/listbox :id :issue-list
+                        :font (Font. Font/MONOSPACED Font/PLAIN 12)
+                        :selection-mode :single)
+             :preferred-size [400 :by 600])
 
-                ;; Right: Detail panel
-             (s/border-panel
-              :id :detail-panel
-              :border [10 10 10 10]
+               ;; Right: Detail panel
+            (s/border-panel
+             :id :detail-panel
+             :border [10 10 10 10]
 
-                  ;; Title at top
-              :north (s/label :id :title-label
-                              :text "No issue selected"
-                              :font (Font. Font/SANS_SERIF Font/BOLD 16))
+                 ;; Title at top
+             :north (s/label :id :title-label
+                             :text "No issue selected"
+                             :font (Font. Font/SANS_SERIF Font/BOLD 16))
 
-                  ;; Description in center
-              :center (s/scrollable
-                       (s/text :id :description-area
-                               :multi-line? true
-                               :editable? false
-                               :rows 10
-                               :columns 40
-                               :wrap-lines? true
-                               :font (Font. Font/SANS_SERIF Font/PLAIN 12)))
+                 ;; Description in center
+             :center (s/scrollable
+                      (s/text :id :description-area
+                              :multi-line? true
+                              :editable? false
+                              :rows 10
+                              :columns 40
+                              :wrap-lines? true
+                              :font (Font. Font/SANS_SERIF Font/PLAIN 12)))
 
-                  ;; Metadata at bottom
-              :south (s/vertical-panel
-                      :id :metadata-panel
-                      :border [10 10 10 10]
-                      :items [(s/label :id :id-label :text "")
-                              (s/label :id :status-label :text "")
-                              (s/label :id :priority-label :text "")
-                              (s/label :id :type-label :text "")
-                              (s/label :id :labels-label :text "")
-                              (s/label :id :created-label :text "")
-                              (s/label :id :updated-label :text "")]))
+                 ;; Metadata at bottom
+             :south (s/vertical-panel
+                     :id :metadata-panel
+                     :border [10 10 10 10]
+                     :items [(s/label :id :id-label :text "")
+                             (s/label :id :status-label :text "")
+                             (s/label :id :priority-label :text "")
+                             (s/label :id :type-label :text "")
+                             (s/label :id :labels-label :text "")
+                             (s/label :id :created-label :text "")
+                             (s/label :id :updated-label :text "")]))
 
-             :divider-location 400
-             :resize-weight 0.4))))
+            :divider-location 400
+            :resize-weight 0.4)))
 
 ;; ============================================================================
 ;; Event Wiring
@@ -142,27 +145,89 @@
   (swap! db/*app-state assoc-in [:ui-refs :updated-label] (s/select frame [:#updated-label])))
 
 ;; ============================================================================
+;; Hot Reload
+;; ============================================================================
+
+(defn rebuild-ui!
+  "Rebuild the UI from fresh code without restarting the app.
+  This is the HOT RELOAD magic!
+  
+  1. Removes old content from frame
+  2. Creates NEW content from fresh view functions
+  3. Re-wires events to new widgets
+  4. Re-sets up watchers
+  5. Refreshes display
+  
+  Call this after (require 'bd-viewer.ui :reload)"
+  []
+  (when-let [frame @*frame]
+    (s/invoke-later
+     (fn []
+       (log/info :rebuild-ui! :start true)
+
+       ;; Create fresh content from latest code
+       (let [new-content (create-content)
+             content-pane (.getContentPane frame)]
+
+         ;; Remove old content
+         (.removeAll content-pane)
+
+         ;; Add new content
+         (.add content-pane new-content java.awt.BorderLayout/CENTER)
+
+         ;; Re-wire events to new widgets
+         (wire-events! frame)
+
+         ;; Store UI refs for effects
+         (store-ui-refs! frame)
+
+         ;; Re-setup watchers with new widgets
+         ;; Note: This requires requiring effects.swing with :reload too
+         (require 'bd-viewer.effects.swing :reload)
+         ((resolve 'bd-viewer.effects.swing/setup-watchers!) frame)
+
+         ;; Refresh display
+         (.validate frame)
+         (.repaint frame)
+
+         (log/info :rebuild-ui! :success true))))))
+
+;; ============================================================================
 ;; Main Frame Creation
 ;; ============================================================================
 
 (defn create-main-frame []
-  "Create and show the main application window."
-  (let [frame (create-ui)]
+  "Create and show the main application window.
+  Uses defonce *frame atom for hot reload support.
+  
+  On first call: Creates frame, builds UI, shows window
+  On subsequent calls: Returns existing frame (already visible)"
+  (if @*frame
+    @*frame ; Frame already exists
+    (let [frame (s/frame :title "BD Viewer"
+                         :size [1000 :by 700]
+                         :on-close :exit)]
+      (reset! *frame frame)
 
-    ;; Wire up event handlers
-    (wire-events! frame)
+      ;; Build initial UI using rebuild-ui! so same code path
+      ;; Create content
+      (let [content (create-content)]
+        (.add (.getContentPane frame) content java.awt.BorderLayout/CENTER))
 
-    ;; Store UI references
-    (store-ui-refs! frame)
+      ;; Wire up event handlers
+      (wire-events! frame)
 
-    ;; Show window
-    (s/show! frame)
+      ;; Store UI references
+      (store-ui-refs! frame)
 
-    ;; Set initial focus to the issue list (not search bar)
-    ;; This allows j/k navigation to work immediately!
-    (s/invoke-later
-     (fn []
-       (.requestFocusInWindow (s/select frame [:#issue-list]))))
+      ;; Show window
+      (s/show! frame)
 
-    (log/info :create-main-frame :success true)
-    frame))
+      ;; Set initial focus to the issue list (not search bar)
+      ;; This allows j/k navigation to work immediately!
+      (s/invoke-later
+       (fn []
+         (.requestFocusInWindow (s/select frame [:#issue-list]))))
+
+      (log/info :create-main-frame :success true)
+      frame)))

@@ -83,6 +83,16 @@
     ;; Reload: Cmd+R
     ;; ========================================================================
 
+;; Cmd+Shift+R - Reload code (hot reload!)
+    (.put input-map
+          (KeyStroke/getKeyStroke KeyEvent/VK_R (bit-or cmd-mask java.awt.event.InputEvent/SHIFT_DOWN_MASK))
+          "reload-code")
+    (.put action-map "reload-code"
+          (proxy [AbstractAction] []
+            (actionPerformed [e]
+              (log/debug :keyboard/cmd-shift-r-pressed)
+              (events/handle-event {:event/type ::events/reload-code}))))
+
     ;; Cmd+R - Reload issues
     (.put input-map
           (KeyStroke/getKeyStroke KeyEvent/VK_R cmd-mask)
@@ -146,7 +156,8 @@
             :cmd-d "delete"
             :delete "delete"
             :cmd-delete "delete"
-            :cmd-r "reload"
+            :cmd-shift-r "reload code (hot reload!)"
+            :cmd-r "reload issues"
             :cmd-f "focus search (TODO)"
             :escape "clear filter"))
 
