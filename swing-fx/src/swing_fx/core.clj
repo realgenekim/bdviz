@@ -206,6 +206,47 @@
          (.start timer)
          (reset! notification-timer timer))))))
 
+;; ============================================================================
+;; Hot Reload Hooks
+;; ============================================================================
+
+(defonce ^:private *reload-hooks* (atom []))
+
+(defn register-reload-hook!
+  "Register a function to be called during hot reload.
+  
+  The function receives the frame as an argument and is called automatically
+  when reload! is invoked. This is perfect for re-registering keyboard shortcuts,
+  re-initializing listeners, or any other setup that needs to happen on reload.
+  
+  Usage:
+    ; Register keyboard shortcuts to reload automatically
+    (sf/register-reload-hook! 
+      (fn [frame] 
+        (keyboard/setup-keyboard-shortcuts! frame)))
+  
+  The hook is registered once at startup, then automatically called on every
+  reload. This prevents the common mistake of forgetting to re-register things
+  like keyboard shortcuts during hot reload!"
+  [hook-fn]
+  (swap! *reload-hooks* conj hook-fn))
+
+(defn reload!
+  "Execute all registered reload hooks.
+  
+  Call this from your ::reload-code event handler to automatically run all
+  registered hooks (keyboard shortcuts, listeners, etc).
+  
+  Example in your events.clj:
+    (defmethod handle-event ::reload-code [_]
+      (require 'my-app.ui :reload)
+      (require 'my-app.keyboard :reload)
+      ((resolve 'my-app.ui/rebuild-ui!))
+      (sf/reload! @my-app.ui/*frame))  ; Runs all hooks!"
+  [frame]
+  (doseq [hook @*reload-hooks*]
+    (hook frame)))
+
 (comment
   ;; Example usage
   (def *state (atom {:count 0 :name "Alice"}))
@@ -229,4 +270,12 @@
   ;; Updating something else doesn't trigger watchers
   (swap! *state assoc :other "value")
   ;; => (no output - only watched paths trigger handlers)
+
+  ;; Register reload hooks
+  (register-reload-hook!
+   (fn [frame]
+     (println "Reloading keyboard shortcuts!")))
+
+  (reload! my-frame)
+  ;; => Reloading keyboard shortcuts!
   )

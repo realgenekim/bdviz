@@ -160,8 +160,9 @@
   2. Creates NEW content from fresh view functions
   3. Re-wires events to new widgets
   4. Re-sets up watchers
-  5. Forces state refresh to populate new widgets
-  6. Refreshes display
+  5. Runs all reload hooks (keyboard shortcuts, etc)
+  6. Forces state refresh to populate new widgets
+  7. Refreshes display
   
   Call this after (require 'bd-viewer.ui :reload)"
   []
@@ -194,6 +195,10 @@
            ;; Note: This requires requiring effects.swing with :reload too
            (require 'bd-viewer.effects.swing :reload)
            ((resolve 'bd-viewer.effects.swing/setup-watchers!) frame)
+
+           ;; Run all registered reload hooks (keyboard shortcuts, etc)
+           ;; This automatically re-registers anything that was hooked at startup!
+           (sf/reload! frame)
 
            ;; Refresh display
            (.validate frame)

@@ -146,13 +146,31 @@
               (let [show-open? (:show-open-only @db/*app-state)]
                 (sf/notify! frame (if show-open?
                                     "Showing open issues only"
-                                    "Showing all issues")))))))
+                                    "Showing all issues"))))))
+
+    ;; ========================================================================
+    ;; Close Issue: c - Mark current issue as closed
+    ;; ========================================================================
+
+    ;; c - Close current issue
+    (.put input-map
+          (KeyStroke/getKeyStroke KeyEvent/VK_C 0)
+          "close-issue")
+    (.put action-map "close-issue"
+          (proxy [AbstractAction] []
+            (actionPerformed [e]
+              (log/debug :keyboard/c-pressed)
+              (when-let [issue-id (:selected-issue @db/*app-state)]
+                (let [result (events/handle-event {:event/type ::events/close-issue})]
+                  (when (= result :success)
+                    (sf/notify! frame (str "Issue " issue-id " closed!")))))))))
 
   (log/info :setup-keyboard-shortcuts! :success true)
   (log/info :keyboard/shortcuts-enabled
             :j "next issue"
             :k "previous issue"
             :o "toggle open/all"
+            :c "close issue"
             :cmd-d "delete"
             :delete "delete"
             :cmd-delete "delete"

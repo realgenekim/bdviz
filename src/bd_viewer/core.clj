@@ -4,6 +4,7 @@
             [bd-viewer.ui :as ui]
             [bd-viewer.effects.swing :as fx]
             [bd-viewer.keyboard :as kbd]
+            [swing-fx.core :as sf]
             [taoensso.timbre :as log]
             [clojure.java.io :as io]
             [clojure.pprint :as pp])
@@ -37,7 +38,11 @@
     ;; 4. Setup keyboard shortcuts (after UI exists!)
     (kbd/setup-keyboard-shortcuts! frame)
 
-    ;; 5. Add state dump watcher for debugging
+    ;; 5. Register keyboard shortcuts to reload automatically on Cmd+Shift+R
+    ;; This hook will be called automatically by rebuild-ui! via sf/reload!
+    (sf/register-reload-hook! kbd/setup-keyboard-shortcuts!)
+
+    ;; 6. Add state dump watcher for debugging
     (add-watch db/*app-state ::dump-state
                (fn [_ _ old-state new-state]
                  (dump-state-to-file!)))

@@ -148,7 +148,7 @@ The bd-viewer app demonstrates:
 
 ## API
 
-The library is tiny - just **one function**! The value is in the **pattern**, not code volume.
+The library provides a few essential functions for reactive Swing development.
 
 ### `watch!`
 
@@ -168,6 +168,47 @@ Watch an atom path and run handler on EDT when value changes.
 - ✅ Automatic diff checking - only calls handler when value actually changes
 - ✅ Explicit and visible - you can see what path is watched and what happens
 - ✅ No magic - no hidden subscriptions or dependency tracking
+
+### `register-reload-hook!` and `reload!`
+
+**The problem:** When you hot reload code with Cmd+Shift+R, keyboard shortcuts don't get re-registered automatically. You have to remember to add keyboard setup to your `rebuild-ui!` function, and it's easy to forget!
+
+**The solution:** Register hooks that run automatically on every reload:
+
+```clojure
+;; In your core.clj startup code (runs once):
+(defn -main []
+  (let [frame (ui/create-main-frame)]
+    ;; Setup keyboard shortcuts initially
+    (kbd/setup-keyboard-shortcuts! frame)
+
+    ;; Register hook so it reloads automatically!
+    (sf/register-reload-hook! kbd/setup-keyboard-shortcuts!)
+
+    ;; Any other setup that needs to reload can register too
+    (sf/register-reload-hook!
+      (fn [frame] (println "Reloading custom setup!")))))
+
+;; In your rebuild-ui! function:
+(defn rebuild-ui! []
+  (when-let [frame @*frame]
+    ;; ... rebuild UI widgets ...
+
+    ;; Run all registered hooks automatically!
+    (sf/reload! frame)))
+```
+
+**Benefits:**
+- ✅ **Automatic** - Register once at startup, works forever
+- ✅ **Impossible to forget** - Hooks run automatically on every reload
+- ✅ **Flexible** - Register any setup logic that needs to run on reload
+- ✅ **Clean** - No need to remember to call keyboard setup in rebuild-ui!
+
+**Common use cases:**
+- Keyboard shortcuts (always need to be re-registered)
+- Custom event listeners
+- Third-party library initialization
+- Any setup that depends on fresh code
 
 ## Why This Pattern Works
 

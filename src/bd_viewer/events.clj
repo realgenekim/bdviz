@@ -151,6 +151,34 @@
                    :exception (.getMessage e))
         nil))))
 
+(defmethod handle-event ::close-issue
+  [_event]
+  (when-let [issue-id (:selected-issue @db/*app-state)]
+    (log/info ::close-issue :issue-id issue-id)
+    (try
+      (let [result (shell/sh "bd" "update" issue-id "--status" "closed")
+            exit-code (:exit result)]
+        (if (zero? exit-code)
+          (do
+            (log/info ::close-issue
+                      :success true
+                      :issue-id issue-id)
+            ;; Reload issues to get updated data
+            (handle-event {:event/type ::reload-issues})
+            ;; Return success indicator for notification
+            :success)
+          (do
+            (log/error ::close-issue
+                       :failed true
+                       :exit-code exit-code
+                       :stderr (:err result))
+            ;; TODO: Show error dialog
+            nil)))
+      (catch Exception e
+        (log/error ::close-issue
+                   :exception (.getMessage e))
+        nil))))
+
 (defmethod handle-event ::new-issue
   [{:keys [title description priority issue-type labels]}]
   (log/info ::new-issue
