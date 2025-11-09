@@ -95,15 +95,23 @@
     (str "#" id-num " " short-title)))
 
 (def graph-style
-  "Graph styling configuration - simple and clean!"
-  {:node {:size 50
-          :fill-color "gray"
-          :text-size 24
-          :text-style "bold"}
-   :node-open {:fill-color "#2ECC71"}
-   :node-blocked {:fill-color "#E74C3C"}
+  "Graph styling - wide rectangular boxes with normal text"
+  {:node {:shape "box"
+          :size "250px, 20px"
+          :fill-color "white"
+          :stroke-mode "plain"
+          :stroke-color "black"
+          :stroke-width "1px"
+          :text-size 9
+          :text-alignment "center"}
+   :node-open {:fill-color "#E8F8F5"
+               :stroke-color "#2ECC71"
+               :stroke-width "2px"}
+   :node-blocked {:fill-color "#FADBD8"
+                  :stroke-color "#E74C3C"
+                  :stroke-width "2px"}
    :edge {:fill-color "#000000"
-          :size 5}})
+          :size 2}})
 
 (defn style-map->css
   "Convert style map to GraphStream CSS string."
@@ -135,18 +143,17 @@
     ;; Add nodes for all issues
     (doseq [issue issues]
       (let [node (.addNode graph (:id issue))
-            issue-type (:issue-type issue)
             status (:status issue)
             title (:title issue)]
-        ;; Set label - just the issue number
+        ;; Set label with task context
         (set-attr! node "ui.label" (format-node-label (:id issue) title))
-        ;; Set CSS class based on status or type
-        (set-attr! node "ui.class"
-                   (if (= "epic" issue-type)
-                     "epic"
-                     (status-class status)))))
+        ;; Set CSS class: open or blocked (others stay gray)
+        (when (= "open" status)
+          (set-attr! node "ui.class" "open"))
+        (when (= "blocked" status)
+          (set-attr! node "ui.class" "blocked"))))
 
-;; Phase 4: Add edges from dependencies! 🎯
+    ;; Phase 4: Add edges from dependencies! 🎯
     (let [dependencies (beads-db/get-dependencies)]
       (log/info :create-graph-from-issues/edges
                 :dependency-count (count dependencies))
@@ -154,15 +161,7 @@
         (let [from-node (.getNode graph depends-on-id)
               to-node (.getNode graph issue-id)]
           (when (and from-node to-node)
-            (let [edge-id (str issue-id "->" depends-on-id)
-                  edge (.addEdge graph edge-id depends-on-id issue-id true)]
-              (set-attr! edge "ui.class"
-                         (case type
-                           "blocks" "blocks"
-                           "parent-child" "parentchild"
-                           "related" "related"
-                           "discovered-from" "discovered"
-                           "default")))))))
+            (.addEdge graph (str issue-id "->" depends-on-id) depends-on-id issue-id true)))))
 
     ;; Apply stylesheet from Clojure data
     (set-attr! graph "ui.stylesheet" (style-map->css graph-style))
@@ -249,3 +248,9 @@
       (save-screenshot! graph-panel))
 
     panel))
+
+(comment
+  
+  (test-graph-render!)
+  
+  )
