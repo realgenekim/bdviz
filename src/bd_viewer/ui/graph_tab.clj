@@ -94,15 +94,24 @@
         short-title (subs title 0 (min 20 (count title)))]
     (str "#" id-num " " short-title)))
 
+;; Graph node dimensions (width × height in pixels)
+(def node-size "250px, 40px")
+
+;; Graph text size (in points)
+(def node-text-size 20)
+
+(comment
+  (test-graph-render!))
+
 (def graph-style
   "Graph styling - wide rectangular boxes with normal text"
   {:node {:shape "box"
-          :size "250px, 20px"
+          :size node-size ; 250px wide × 20px tall
           :fill-color "white"
           :stroke-mode "plain"
           :stroke-color "black"
           :stroke-width "1px"
-          :text-size 9
+          :text-size node-text-size ; 9pt font
           :text-alignment "center"}
    :node-open {:fill-color "#E8F8F5"
                :stroke-color "#2ECC71"
@@ -250,7 +259,5 @@
     panel))
 
 (comment
-  
-  (test-graph-render!)
-  
-  )
+
+  (test-graph-render!))
