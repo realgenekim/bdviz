@@ -10,6 +10,7 @@
   - Dependency types: 'blocks', 'parent-child', 'related', 'discovered-from'"
   (:require [clojure.java.shell :as shell]
             [clojure.string :as str]
+            [clojure.java.io :as io]
             [taoensso.timbre :as log]))
 
 ;; ============================================================================
@@ -23,10 +24,38 @@
   (or (System/getenv "BD_VIEWER_DIR") "."))
 
 (defn db-path
-  "Get the full path to the Beads SQLite database.
-  Returns .beads/bd-viewer.db relative to target directory."
+  "Get the full path to the Beads SQLite database for the target directory.
+  
+  Strategy:
+  1. Look for a .db file that matches the directory name (e.g., slack-retriever.db)
+  2. If not found, look for any .db file in .beads/
+  3. If still not found, construct the path based on directory name
+  
+  This prevents querying the wrong database when running against different projects."
   []
-  (str (get-target-dir) "/.beads/bd-viewer.db"))
+  (let [target-dir (get-target-dir)
+        ;; Get the directory basename (e.g., 'slack-retriever' from '../slack-retriever')
+        dir-name (.getName (io/file target-dir))
+        beads-dir (io/file target-dir ".beads")
+        expected-db-name (str dir-name ".db")]
+
+    (if (.exists beads-dir)
+      ;; .beads directory exists - look for database
+      (let [db-files (->> (.listFiles beads-dir)
+                          (filter #(.endsWith (.getName %) ".db"))
+                          vec)
+            ;; Try to find database matching directory name
+            matching-db (first (filter #(= (.getName %) expected-db-name) db-files))]
+        (if matching-db
+          ;; Found matching database
+          (.getAbsolutePath matching-db)
+          ;; No matching database - use first .db file or construct path
+          (if (seq db-files)
+            (.getAbsolutePath (first db-files))
+            ;; No database exists - return expected path (will fail query but that's okay)
+            (.getAbsolutePath (io/file beads-dir expected-db-name)))))
+      ;; .beads directory doesn't exist - return expected path
+      (.getAbsolutePath (io/file beads-dir expected-db-name)))))
 
 ;; ============================================================================
 ;; SQLite Query Helper

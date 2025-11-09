@@ -14,16 +14,24 @@
 (defn create-diagram-panel
   "Create panel displaying Mermaid diagram as image.
   
-  Fetches diagram from mermaid.ink and displays in a JLabel."
+  Fetches diagram from mermaid.ink, saves it to target directory, and displays in a JLabel."
   [issues deps]
   (try
     (let [mermaid-str (mermaid/generate-mermaid-diagram issues deps)
           img (mermaid/fetch-diagram-image mermaid-str)]
       (if img
-        (let [icon (ImageIcon. img)
-              label (JLabel. icon)]
-          (doto (JPanel. (BorderLayout.))
-            (.add label BorderLayout/CENTER)))
+        (do
+          ;; Save diagram to target directory
+          (let [target-dir (db/get-target-dir)
+                output-file (str target-dir "/dependency-graph.png")]
+            (javax.imageio.ImageIO/write img "png" (io/file output-file))
+            (log/info :save-diagram :success true :file output-file))
+
+          ;; Display in UI
+          (let [icon (ImageIcon. img)
+                label (JLabel. icon)]
+            (doto (JPanel. (BorderLayout.))
+              (.add label BorderLayout/CENTER))))
         ;; Error case - show message
         (s/label :text "Error: Could not fetch diagram from mermaid.ink"
                  :font (Font. Font/SANS_SERIF Font/BOLD 16))))
