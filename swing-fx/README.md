@@ -420,6 +420,40 @@ Add new events without touching existing code:
 
 ## Best Practices
 
+### Split Panes: Avoid Mixing Pixels and Proportions
+
+When using `left-right-split` or `top-bottom-split`, be careful with divider positioning:
+
+**❌ BAD - Mixing pixels and proportions causes "snap back" behavior:**
+```clojure
+(s/left-right-split
+  left-panel
+  right-panel
+  :divider-location 400      ;; Fixed pixels!
+  :resize-weight 0.4)        ;; Proportional!
+;; User drags divider → snaps back to 400px
+```
+
+**✅ GOOD - Use proportional values only:**
+```clojure
+(s/left-right-split
+  left-panel
+  right-panel
+  :resize-weight 0.4)        ;; 40% left, 60% right
+;; User adjustments stick, window resizing works correctly
+```
+
+**✅ ALSO GOOD - Both proportional:**
+```clojure
+(s/left-right-split
+  left-panel
+  right-panel
+  :divider-location 0.4      ;; 0.0-1.0 = proportion
+  :resize-weight 0.4)
+```
+
+**Why?** Mixing fixed pixels (`:divider-location 400`) with proportions (`:resize-weight 0.4`) creates conflicts. Swing might try to restore the pixel position, fighting user adjustments. Stick to proportional values for user-resizable splits!
+
 ### DO:
 ✅ Keep db.clj and events.clj framework-agnostic (no GUI imports)  
 ✅ Use one watcher per UI concern (clear and debuggable)  
