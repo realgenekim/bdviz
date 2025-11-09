@@ -454,6 +454,41 @@ When using `left-right-split` or `top-bottom-split`, be careful with divider pos
 
 **Why?** Mixing fixed pixels (`:divider-location 400`) with proportions (`:resize-weight 0.4`) creates conflicts. Swing might try to restore the pixel position, fighting user adjustments. Stick to proportional values for user-resizable splits!
 
+### Split Panes: Make Dividers Visible and Both Panes Resizable
+
+Users often can't find or drag split pane dividers, or can only drag in one direction.
+
+**Problem 1: Invisible divider**
+- Default divider size is often 1-2px (hard to see/grab)
+- Solution: Set `:divider-size` to 8px or more
+
+**Problem 2: Can only drag one direction**
+- Right panel has implicit minimum size from child components
+- Detail panels with labels/text areas resist shrinking
+- Solution: Set explicit `:minimum-size` on BOTH panels
+
+**✅ Complete example:**
+```clojure
+(s/left-right-split
+  ;; Left panel - set minimum so it can shrink
+  (s/scrollable
+    (s/listbox :id :items)
+    :minimum-size [200 :by 400])
+
+  ;; Right panel - set minimum so it can shrink too!
+  (s/border-panel
+    :id :detail
+    :minimum-size [200 :by 400]
+    :north (s/label :text "Details")
+    :center (s/text :multi-line? true))
+
+  ;; Make divider visible and easier to grab
+  :divider-size 8
+  :resize-weight 0.4)
+```
+
+**Key insight:** Without explicit `:minimum-size` on the right panel, Swing calculates minimum size from child components (labels, text areas, etc.), which prevents the divider from moving right. Set small minimums on both sides for full bidirectional resizing!
+
 ### DO:
 ✅ Keep db.clj and events.clj framework-agnostic (no GUI imports)  
 ✅ Use one watcher per UI concern (clear and debuggable)  

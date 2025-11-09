@@ -123,7 +123,8 @@
   (when-let [issue-id (:selected-issue @db/*app-state)]
     (log/info ::delete-issue :issue-id issue-id)
     (try
-      (let [result (shell/sh "bd" "delete" issue-id)
+      (let [target-dir (db/get-target-dir)
+            result (shell/sh "bd" "delete" issue-id :dir target-dir)
             exit-code (:exit result)]
         (if (zero? exit-code)
           (do
@@ -144,19 +145,20 @@
                        :failed true
                        :exit-code exit-code
                        :stderr (:err result))
-            ;; TODO: Show error dialog
-            nil)))
+            ;; Return error signal for notification
+            {:error (str "Failed to delete: " (:err result))})))
       (catch Exception e
         (log/error ::delete-issue
                    :exception (.getMessage e))
-        nil))))
+        {:error (.getMessage e)}))))
 
 (defmethod handle-event ::close-issue
   [_event]
   (when-let [issue-id (:selected-issue @db/*app-state)]
     (log/info ::close-issue :issue-id issue-id)
     (try
-      (let [result (shell/sh "bd" "update" issue-id "--status" "closed")
+      (let [target-dir (db/get-target-dir)
+            result (shell/sh "bd" "update" issue-id "--status" "closed" :dir target-dir)
             exit-code (:exit result)]
         (if (zero? exit-code)
           (do
@@ -172,12 +174,12 @@
                        :failed true
                        :exit-code exit-code
                        :stderr (:err result))
-            ;; TODO: Show error dialog
-            nil)))
+            ;; Return error signal for notification
+            {:error (str "Failed to close: " (:err result))})))
       (catch Exception e
         (log/error ::close-issue
                    :exception (.getMessage e))
-        nil))))
+        {:error (.getMessage e)}))))
 
 (defmethod handle-event ::new-issue
   [{:keys [title description priority issue-type labels]}]
@@ -311,11 +313,12 @@
   (log/info ::reload-code :start true)
   (try
     ;; Reload all namespaces with fresh code
-    (require 'bd-viewer.ui :reload)
+    ;; IMPORTANT: Reload db FIRST, before events, so new functions are available
+    (require 'bd-viewer.db :reload)
     (require 'bd-viewer.events :reload)
     (require 'bd-viewer.effects.swing :reload)
     (require 'bd-viewer.keyboard :reload)
-    (require 'bd-viewer.db :reload)
+    (require 'bd-viewer.ui :reload)
 
     ;; Rebuild UI with fresh view functions
     ((resolve 'bd-viewer.ui/rebuild-ui!))

@@ -45,6 +45,12 @@
 ;; Loading Issues from BD CLI
 ;; ============================================================================
 
+(defn get-target-dir
+  "Get the target directory for bd commands.
+  Respects BD_VIEWER_DIR environment variable."
+  []
+  (or (System/getenv "BD_VIEWER_DIR") "."))
+
 (defn load-issues-from-bd
   "Shell out to 'bd list --json' and parse results.
   Returns vector of ClosedRecord-wrapped issues.
@@ -53,7 +59,7 @@
   []
   (log/info :load-issues-from-bd :start true)
   (try
-    (let [target-dir (or (System/getenv "BD_VIEWER_DIR") ".")
+    (let [target-dir (get-target-dir)
           result (shell/sh "bd" "list" "--json" :dir target-dir)
           exit-code (:exit result)]
       (log/info :load-issues-from-bd :target-dir target-dir)

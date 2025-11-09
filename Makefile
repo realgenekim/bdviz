@@ -3,9 +3,15 @@ DIR ?= .
 run:
 	BD_VIEWER_DIR=$(DIR) clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core 2>&1 | tee 00LOGS.txt
 
+# Run tests with kaocha - watch mode
+runtests:
+	@echo "Running tests with watcher..."
+	clj -M:run-tests --watch --reporter kaocha.report.progress/report
+
+# Run tests once with fail-fast
 runtests-once:
-	@echo "Checking compilation..."
-	clj -M -e "(compile 'bd-viewer.core)"
+	@echo "Running tests with fail-fast..."
+	clj -M:run-tests --fail-fast
 
 # Start nREPL server (auto-assigns port, writes to .nrepl-port)
 nrepl:

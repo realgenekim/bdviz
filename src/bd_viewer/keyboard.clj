@@ -57,7 +57,9 @@
           (proxy [AbstractAction] []
             (actionPerformed [e]
               (log/debug :keyboard/cmd-d-pressed)
-              (events/handle-event {:event/type ::events/delete-issue}))))
+              (let [result (events/handle-event {:event/type ::events/delete-issue})]
+                (when (:error result)
+                  (sf/notify-error! frame (:error result)))))))
 
     ;; Delete key - Delete issue
     (.put input-map
@@ -67,7 +69,9 @@
           (proxy [AbstractAction] []
             (actionPerformed [e]
               (log/debug :keyboard/delete-pressed)
-              (events/handle-event {:event/type ::events/delete-issue}))))
+              (let [result (events/handle-event {:event/type ::events/delete-issue})]
+                (when (:error result)
+                  (sf/notify-error! frame (:error result)))))))
 
     ;; Cmd+Delete - Delete issue (alternate)
     (.put input-map
@@ -77,7 +81,9 @@
           (proxy [AbstractAction] []
             (actionPerformed [e]
               (log/debug :keyboard/cmd-delete-pressed)
-              (events/handle-event {:event/type ::events/delete-issue}))))
+              (let [result (events/handle-event {:event/type ::events/delete-issue})]
+                (when (:error result)
+                  (sf/notify-error! frame (:error result)))))))
 
     ;; ========================================================================
     ;; Reload: Cmd+R
@@ -165,8 +171,12 @@
               (log/debug :keyboard/c-pressed)
               (when-let [issue-id (:selected-issue @db/*app-state)]
                 (let [result (events/handle-event {:event/type ::events/close-issue})]
-                  (when (= result :success)
-                    (sf/notify! frame (str "Issue " issue-id " closed!"))))))))
+                  (cond
+                    (= result :success)
+                    (sf/notify! frame (str "Issue " issue-id " closed!"))
+
+                    (:error result)
+                    (sf/notify-error! frame (:error result))))))))
 
     ;; ========================================================================
     ;; TEST: z - Trigger divide-by-zero error (tests error notification)
