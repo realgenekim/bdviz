@@ -2,11 +2,12 @@
   "Graph visualization tab for bd-viewer - shows dependency graph.
 
   Phase 1: Placeholder panel ✅
-  Phase 2: Static graph with hardcoded data (this file!)
-  Phase 3: Load real Beads data from bd command
+  Phase 2: Static graph with hardcoded data ✅
+  Phase 3: Load real Beads data from bd command (this file!)
   Phase 4: Interactivity (click nodes, filters)
   Phase 5: Auto-refresh and live updates"
-  (:require [seesaw.core :as s])
+  (:require [seesaw.core :as s]
+            [bd-viewer.db :as db])
   (:import [java.awt Font BorderLayout]
            [org.graphstream.graph.implementations SingleGraph]
            [org.graphstream.ui.swing_viewer SwingViewer]
@@ -107,17 +108,100 @@
     (doto (JPanel. (BorderLayout.))
       (.add view BorderLayout/CENTER))))
 
+(defn status-class [status]
+  "Map issue status to CSS class name."
+  (case status
+    "open" "open"
+    "in_progress" "inprogress"
+    "in-progress" "inprogress"
+    "blocked" "blocked"
+    "closed" "closed"
+    "default"))
+
+(defn create-graph-from-issues [issues]
+  "Create a GraphStream graph from real Beads issues.
+
+  Phase 3: Load from actual bd data!
+  - Reads issues from app state
+  - Creates nodes for all issues
+  - Creates edges from dependents relationships"
+  (let [graph (SingleGraph. "beads-deps")]
+
+    ;; Add nodes for all issues
+    (doseq [issue issues]
+      (let [node (.addNode graph (:id issue))
+            issue-type (:issue-type issue)  ; kebab-case from ClosedRecord
+            status (:status issue)
+            title (:title issue)]
+        ;; Set label with ID and truncated title
+        (set-attr! node "ui.label" (str (:id issue) "\n" (subs title 0 (min 30 (count title)))))
+        ;; Set CSS class based on status or type
+        (set-attr! node "ui.class"
+                   (if (= "epic" issue-type)
+                     "epic"
+                     (status-class status)))))
+
+    ;; TODO: Add edges from dependencies
+    ;; For now, bd list --json doesn't include dependency info
+    ;; We'll need to either:
+    ;;   1. Load dependencies separately with bd dep tree
+    ;;   2. Parse .beads/issues.jsonl directly
+    ;; Phase 4 will add this!
+
+    ;; Apply same stylesheet as test graph
+    (set-attr! graph "ui.stylesheet"
+               "node {
+                  size: 30px;
+                  fill-color: gray;
+                  text-size: 42;
+                  text-style: bold;
+                  text-alignment: under;
+                  stroke-mode: plain;
+                  stroke-color: black;
+                  stroke-width: 2px;
+                }
+                node.epic {
+                  fill-color: #9B59B6;
+                  size: 45px;
+                  text-size: 48;
+                  text-style: bold;
+                }
+                node.open {
+                  fill-color: #2ECC71;
+                }
+                node.inprogress {
+                  fill-color: #F39C12;
+                }
+                node.blocked {
+                  fill-color: #E74C3C;
+                }
+                node.closed {
+                  fill-color: #95A5A6;
+                }
+                edge {
+                  fill-color: #7F8C8D;
+                  arrow-size: 8px, 6px;
+                }")
+
+    graph))
+
 (defn create-graph-panel []
   "Create the graph visualization panel.
 
-  Phase 2: Show actual GraphStream graph with hardcoded test data.
+  Phase 3: Show actual Beads issues from bd command!
   Returns a border-panel with graph view and header."
-  (let [graph (create-test-graph)
-        graph-panel (embed-graph-viewer graph)]
+  (let [issues (:issues @db/*app-state)
+        graph (if (empty? issues)
+                (create-test-graph)  ; Fallback to test data if no issues
+                (create-graph-from-issues issues))
+        graph-panel (embed-graph-viewer graph)
+        label-text (if (empty? issues)
+                     "Dependency Graph (Test Data - No Issues Loaded)"
+                     (str "Dependency Graph (" (count issues) " issues)"))]
 
     (s/border-panel
      :north (s/label
-             :text "Dependency Graph (Test Data)"
+             :text label-text
              :font (Font. Font/SANS_SERIF Font/BOLD 16)
              :border 5)
      :center graph-panel)))
