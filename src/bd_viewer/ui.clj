@@ -49,12 +49,14 @@
              (s/listbox :id :issue-list
                         :font (Font. Font/MONOSPACED Font/PLAIN 14)
                         :selection-mode :single)
-             :preferred-size [400 :by 600])
+             :preferred-size [400 :by 600]
+             :minimum-size [200 :by 400])
 
                ;; Right: Detail panel
             (s/border-panel
              :id :detail-panel
              :border [10 10 10 10]
+             :minimum-size [200 :by 400]
 
                  ;; Title at top - bigger and bold
              :north (s/label :id :title-label
@@ -85,7 +87,8 @@
 
             ;; Use resize-weight to control initial layout proportionally
             ;; Left gets 40% of space, right gets 60%
-            ;; No fixed divider-location - allows user to resize freely!
+            ;; Divider can be dragged to resize - both directions now!
+            :divider-size 8
             :resize-weight 0.4)))
 
 ;; ============================================================================
