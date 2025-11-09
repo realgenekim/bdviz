@@ -3,11 +3,13 @@
 
   Phase 1: Placeholder panel ✅
   Phase 2: Static graph with hardcoded data ✅
-  Phase 3: Load real Beads data from bd command (this file!)
-  Phase 4: Interactivity (click nodes, filters)
+  Phase 3: Load real Beads data from bd command ✅
+  Phase 4: Dependency edges and interactivity (this file!)
   Phase 5: Auto-refresh and live updates"
   (:require [seesaw.core :as s]
-            [bd-viewer.db :as db])
+            [bd-viewer.db :as db]
+            [bd-viewer.beads.sqlite :as beads-db]
+            [taoensso.timbre :as log])
   (:import [java.awt Font BorderLayout]
            [org.graphstream.graph.implementations SingleGraph]
            [org.graphstream.ui.swing_viewer SwingViewer]
@@ -50,11 +52,11 @@
       (set-attr! "ui.class" "closed"))
 
     ;; Add edges showing relationships
-    (.addEdge graph "e1" "epic-001" "task-001" true)  ; epic -> task-001
-    (.addEdge graph "e2" "epic-001" "task-002" true)  ; epic -> task-002
-    (.addEdge graph "e3" "task-001" "task-002" true)  ; task-001 blocks task-002
-    (.addEdge graph "e4" "task-002" "task-003" true)  ; task-002 blocks task-003
-    (.addEdge graph "e5" "epic-001" "task-004" true)  ; epic -> task-004
+    (.addEdge graph "e1" "epic-001" "task-001" true) ; epic -> task-001
+    (.addEdge graph "e2" "epic-001" "task-002" true) ; epic -> task-002
+    (.addEdge graph "e3" "task-001" "task-002" true) ; task-001 blocks task-002
+    (.addEdge graph "e4" "task-002" "task-003" true) ; task-002 blocks task-003
+    (.addEdge graph "e5" "epic-001" "task-004" true) ; epic -> task-004
 
     ;; Apply stylesheet for colors and sizing
     (set-attr! graph "ui.stylesheet"
@@ -99,7 +101,7 @@
   Uses GRAPH_IN_GUI_THREAD mode for proper Swing integration.
   Returns a JPanel containing the graph view."
   (let [viewer (SwingViewer. graph Viewer$ThreadingModel/GRAPH_IN_GUI_THREAD)
-        view (.addDefaultView viewer false)]  ; false = embedded mode
+        view (.addDefaultView viewer false)] ; false = embedded mode
 
     ;; Enable automatic layout
     (.enableAutoLayout viewer)
@@ -121,16 +123,18 @@
 (defn create-graph-from-issues [issues]
   "Create a GraphStream graph from real Beads issues.
 
-  Phase 3: Load from actual bd data!
+  Phase 3: Load from actual bd data! ✅
+  Phase 4: Add dependency edges! 🚀
   - Reads issues from app state
   - Creates nodes for all issues
-  - Creates edges from dependents relationships"
+  - Queries SQLite for dependencies
+  - Creates edges with different styles per dependency type"
   (let [graph (SingleGraph. "beads-deps")]
 
     ;; Add nodes for all issues
     (doseq [issue issues]
       (let [node (.addNode graph (:id issue))
-            issue-type (:issue-type issue)  ; kebab-case from ClosedRecord
+            issue-type (:issue-type issue) ; kebab-case from ClosedRecord
             status (:status issue)
             title (:title issue)]
         ;; Set label with ID and truncated title
@@ -141,14 +145,37 @@
                      "epic"
                      (status-class status)))))
 
-    ;; TODO: Add edges from dependencies
-    ;; For now, bd list --json doesn't include dependency info
-    ;; We'll need to either:
-    ;;   1. Load dependencies separately with bd dep tree
-    ;;   2. Parse .beads/issues.jsonl directly
-    ;; Phase 4 will add this!
+;; Phase 4: Add edges from dependencies! 🎯
+    (let [dependencies (beads-db/get-dependencies)]
+      (log/info :create-graph-from-issues/edges
+                :dependency-count (count dependencies))
+      (doseq [{:keys [issue-id depends-on-id type]} dependencies]
+        (let [from-node (.getNode graph depends-on-id)
+              to-node (.getNode graph issue-id)]
+          (log/info :create-graph-from-issues/edge-check
+                    :issue-id issue-id
+                    :depends-on-id depends-on-id
+                    :from-node (boolean from-node)
+                    :to-node (boolean to-node))
+          ;; Only add edge if both nodes exist in the graph
+          (when (and from-node to-node)
+            (let [edge-id (str issue-id "->" depends-on-id)
+                  edge (.addEdge graph edge-id depends-on-id issue-id true)] ; directed edge
+              (log/info :create-graph-from-issues/edge-created
+                        :edge-id edge-id
+                        :type type)
+              ;; Set CSS class based on dependency type
+              (set-attr! edge "ui.class"
+                         (case type
+                           "blocks" "blocks"
+                           "parent-child" "parentchild"
+                           "related" "related"
+                           "discovered-from" "discovered"
+                           "default")))))))
 
-    ;; Apply same stylesheet as test graph
+    ;; Set graph to show edges on top
+
+;; Apply stylesheet with dependency edge styles
     (set-attr! graph "ui.stylesheet"
                "node {
                   size: 30px;
@@ -180,7 +207,23 @@
                 }
                 edge {
                   fill-color: #7F8C8D;
-                  arrow-size: 8px, 6px;
+                  size: 3px;
+                }
+                edge.blocks {
+                  fill-color: #E74C3C;
+                  size: 5px;
+                }
+                edge.parentchild {
+                  fill-color: #3498DB;
+                  size: 3px;
+                }
+                edge.related {
+                  fill-color: #95A5A6;
+                  size: 2px;
+                }
+                edge.discovered {
+                  fill-color: #2ECC71;
+                  size: 2px;
                 }")
 
     graph))
@@ -192,7 +235,7 @@
   Returns a border-panel with graph view and header."
   (let [issues (:issues @db/*app-state)
         graph (if (empty? issues)
-                (create-test-graph)  ; Fallback to test data if no issues
+                (create-test-graph) ; Fallback to test data if no issues
                 (create-graph-from-issues issues))
         graph-panel (embed-graph-viewer graph)
         label-text (if (empty? issues)

@@ -3,8 +3,7 @@
 
   Uses ClosedRecord to ensure type-safe access to state - no more silent nil values!"
   (:require [clojure.spec.alpha :as s]
-            [clojure.data.json :as json]
-            [clojure.java.shell :as shell]
+            [bd-viewer.beads.shell :as beads]
             [closed-record.core :refer [closed-record]]
             [taoensso.timbre :as log]))
 
@@ -47,48 +46,24 @@
 
 (defn get-target-dir
   "Get the target directory for bd commands.
-  Respects BD_VIEWER_DIR environment variable."
+  Delegates to beads.shell for consistency."
   []
-  (or (System/getenv "BD_VIEWER_DIR") "."))
+  (beads/get-target-dir))
 
 (defn load-issues-from-bd
-  "Shell out to 'bd list --json' and parse results.
-  Returns vector of ClosedRecord-wrapped issues.
-
-  Respects BD_VIEWER_DIR environment variable to run bd in a specific directory."
+  "Load issues from Beads using beads.shell abstraction.
+  Returns vector of ClosedRecord-wrapped issues."
   []
   (log/info :load-issues-from-bd :start true)
-  (try
-    (let [target-dir (get-target-dir)
-          result (shell/sh "bd" "list" "--json" :dir target-dir)
-          exit-code (:exit result)]
-      (log/info :load-issues-from-bd :target-dir target-dir)
-      (if (zero? exit-code)
-        (let [raw-output (:out result)
-              ;; Handle both array response and null (empty)
-              parsed (if (or (empty? raw-output) (= "null" (clojure.string/trim raw-output)))
-                       []
-                       (json/read-str raw-output :key-fn keyword))
-              ;; Wrap each issue in ClosedRecord for type safety
-              issues (mapv #(closed-record % {:spec ::issue
-                                              :relax-constructor-constraints? true})
-                           parsed)]
-          (log/info :load-issues-from-bd
-                    :success true
-                    :count (count issues))
-          issues)
-        (do
-          (log/error :load-issues-from-bd
-                     :failed true
-                     :exit-code exit-code
-                     :stderr (:err result))
-          (throw (ex-info "Failed to load issues from bd CLI"
-                          {:exit-code exit-code
-                           :stderr (:err result)})))))
-    (catch Exception e
-      (log/error :load-issues-from-bd
-                 :exception (.getMessage e))
-      (throw e))))
+  (let [raw-issues (beads/list-issues)
+        ;; Wrap each issue in ClosedRecord for type safety
+        issues (mapv #(closed-record % {:spec ::issue
+                                        :relax-constructor-constraints? true})
+                     raw-issues)]
+    (log/info :load-issues-from-bd
+              :success true
+              :count (count issues))
+    issues))
 
 ;; ============================================================================
 ;; State Initialization
