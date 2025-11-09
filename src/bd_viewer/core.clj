@@ -6,9 +6,13 @@
             [bd-viewer.keyboard :as kbd]
             [swing-fx.core :as sf]
             [taoensso.timbre :as log]
+            [logging.main :as glog]
             [clojure.java.io :as io]
             [clojure.pprint :as pp])
   (:gen-class))
+
+;; Configure unified logging - send all Java logging frameworks to timbre
+(glog/configure-logging! glog/config)
 
 (defn dump-state-to-file!
   "Write current app state to state.edn for debugging."

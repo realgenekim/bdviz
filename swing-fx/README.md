@@ -249,6 +249,29 @@ Catch all uncaught exceptions and show error notifications:
 
 Now any crash will show a red notification instead of silently failing!
 
+**IMPORTANT: Testing exception handlers**
+
+To test your exception handler, you MUST use `Thread` directly, NOT `future`:
+
+```clojure
+;; ❌ WRONG - future catches exceptions internally, handler won't trigger
+(future (/ 1 0))
+
+;; ✅ CORRECT - Thread makes exception truly uncaught
+(.start (Thread. (fn [] (/ 1 0))))
+```
+
+**Why?** Clojure's `future` has built-in exception handling:
+- Catches exceptions automatically
+- Stores them inside the future object
+- Only re-throws when you `@deref` the future
+- Since you never deref, exception is silently swallowed!
+
+Java's `Thread` has no exception handling:
+- Exceptions are truly uncaught
+- Trigger `Thread.setDefaultUncaughtExceptionHandler`
+- Your error notification appears!
+
 ## Why This Pattern Works
 
 ### 1. Hot Reload

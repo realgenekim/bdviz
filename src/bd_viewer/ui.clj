@@ -83,7 +83,9 @@
                              (s/label :id :created-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))
                              (s/label :id :updated-label :text "" :font (Font. Font/SANS_SERIF Font/PLAIN 14))]))
 
-            :divider-location 400
+            ;; Use resize-weight to control initial layout proportionally
+            ;; Left gets 40% of space, right gets 60%
+            ;; No fixed divider-location - allows user to resize freely!
             :resize-weight 0.4)))
 
 ;; ============================================================================
@@ -234,7 +236,7 @@
   (if @*frame
     @*frame ; Frame already exists
     (let [frame (s/frame :title "BD Viewer"
-                         :size [1000 :by 700]
+                         :size [1250 :by 700]
                          :on-close :exit)]
       (reset! *frame frame)
 
