@@ -23,7 +23,7 @@
 (def tree-indent-spaces
   "Number of spaces for each indentation level in the tree.
   Adjust this to make the tree more or less indented."
-  4)
+  2)
 
 (def tree-font-family
   "Font family for tree display."
@@ -32,11 +32,11 @@
 (def tree-font-size
   "Font size in pixels for tree display.
   Increase for larger text, decrease for smaller."
-  12)
+  11)
 
 (def tree-color-open
   "Hex color for open issues (default green)."
-  "#2ECC71")
+  "black")
 
 (def tree-color-in-progress
   "Hex color for in-progress issues (default yellow/orange)."
@@ -209,7 +209,9 @@
   "Create tree view panel with keyboard navigation."
   [issues deps]
   (let [selected-id (:selected-issue @db/*app-state)
-        flat-issues (atom (build-flat-issue-list issues deps))
+        flat-issues-list (build-flat-issue-list issues deps)
+        _ (swap! db/*app-state assoc :tree-flat-list flat-issues-list) ; Store for j/k nav
+        flat-issues (atom flat-issues-list)
         html-tree (generate-html-tree issues deps selected-id)
 
         text-pane (doto (JTextPane.)
@@ -230,8 +232,10 @@
                            open-deps (filter (fn [{:keys [issue-id depends-on-id]}]
                                                (and (open-ids issue-id)
                                                     (open-ids depends-on-id)))
-                                             deps)]
-                       (reset! flat-issues (build-flat-issue-list open-issues open-deps))
+                                             deps)
+                           new-flat-list (build-flat-issue-list open-issues open-deps)]
+                       (reset! flat-issues new-flat-list)
+                       (swap! db/*app-state assoc :tree-flat-list new-flat-list) ; Update for j/k nav
                        (refresh-tree-html! text-pane open-issues open-deps selected-id)))]
 
     (log/info :create-tree-panel

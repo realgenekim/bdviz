@@ -1,7 +1,8 @@
 DIR ?= .
 
 run:
-	BD_VIEWER_DIR=$(DIR) clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core -- --tab graph 2>&1 | tee 00LOGS.txt
+	# BD_VIEWER_DIR=$(DIR) clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core -- --tab graph 2>&1 | tee 00LOGS.txt
+	BD_VIEWER_DIR=$(DIR) clj -J-Xdock:name="BD Viewer" -M -m bd-viewer.core -- 2>&1 | tee 00LOGS.txt
 
 # Run tests with kaocha - watch mode
 runtests:

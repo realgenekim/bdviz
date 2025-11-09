@@ -41,13 +41,13 @@
 
 (defn parse-args
   "Parse command line arguments.
-  Supports: --tab [list|graph]"
+  Supports: --tab [tree|list|issues|graph]"
   [args]
   (let [args-vec (vec args)
         tab-idx (.indexOf args-vec "--tab")
         initial-tab (if (and (>= tab-idx 0) (< (inc tab-idx) (count args-vec)))
                       (keyword (get args-vec (inc tab-idx)))
-                      :list)] ; default to list tab
+                      :tree)] ; default to tree tab
     {:initial-tab initial-tab}))
 
 (defn -main [& args]

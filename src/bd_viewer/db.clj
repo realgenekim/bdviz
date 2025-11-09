@@ -38,6 +38,8 @@
          :filter-text "" ; Search filter text
          :sort-by :priority ; Sort criterion
          :show-open-only true ; Toggle: show only open issues (o key)
+         :tree-flat-list nil ; Flat list of issues in tree display order (for Tree View j/k nav)
+         :active-tab 0 ; Currently active tab index (0=Tree, 1=List, 2=Issues, etc.)
          :ui-refs {}})) ; References to Swing widgets
 
 ;; ============================================================================
@@ -155,11 +157,17 @@
 
 (defn select-issue-by-index
   "Select issue at given index in filtered list.
+  Uses tree-flat-list when in Tree View tab, otherwise uses numeric-sorted list.
   Returns the selected issue ID or nil."
   [index]
-  (let [filtered (get-filtered-issues)]
-    (when (and (>= index 0) (< index (count filtered)))
-      (let [issue (nth filtered index)
+  (let [state @*app-state
+        active-tab (:active-tab state)
+        ;; Use tree order in Tree View (tab 0), numeric order elsewhere
+        issue-list (if (and (= active-tab 0) (:tree-flat-list state))
+                     (:tree-flat-list state)
+                     (get-filtered-issues))]
+    (when (and (>= index 0) (< index (count issue-list)))
+      (let [issue (nth issue-list index)
             issue-id (:id issue)]
         (swap! *app-state assoc
                :selected-issue issue-id
@@ -167,18 +175,27 @@
         issue-id))))
 
 (defn select-next-issue
-  "Select the next issue in filtered list (j key)."
+  "Select the next issue in filtered list (j key).
+  Uses tree-flat-list when in Tree View tab, otherwise uses numeric-sorted list."
   []
-  (let [current-index (:selected-index @*app-state)
-        filtered (get-filtered-issues)
+  (let [state @*app-state
+        current-index (:selected-index state)
+        active-tab (:active-tab state)
+        ;; Use tree order in Tree View (tab 0), numeric order elsewhere
+        filtered (if (and (= active-tab 0) (:tree-flat-list state))
+                   (:tree-flat-list state)
+                   (get-filtered-issues))
         next-index (min (inc current-index) (dec (count filtered)))]
     (when (>= next-index 0)
       (select-issue-by-index next-index))))
 
 (defn select-prev-issue
-  "Select the previous issue in filtered list (k key)."
+  "Select the previous issue in filtered list (k key).
+  Uses tree-flat-list when in Tree View tab, otherwise uses numeric-sorted list."
   []
-  (let [current-index (:selected-index @*app-state)
+  (let [state @*app-state
+        current-index (:selected-index state)
+        active-tab (:active-tab state)
         prev-index (max (dec current-index) 0)]
     (when (>= prev-index 0)
       (select-issue-by-index prev-index))))

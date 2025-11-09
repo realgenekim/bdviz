@@ -203,6 +203,14 @@
 (defn wire-events! [frame]
   "Wire up event handlers using Seesaw's listen."
 
+  ;; Tab change listener - track active tab for context-aware j/k navigation
+  (when-let [tabs (s/select frame [:#content])]
+    (s/listen tabs :selection
+              (fn [e]
+                (let [selected-index (.getSelectedIndex (s/to-widget e))]
+                  (swap! db/*app-state assoc :active-tab selected-index)
+                  (log/debug :tab-changed :index selected-index)))))
+
   ;; Search field - listen to document changes
   (s/listen (s/select frame [:#search-field]) :document
             (fn [e]
@@ -394,12 +402,12 @@
   Uses defonce *frame atom for hot reload support.
   
   Arguments:
-  - initial-tab: :list or :graph (default :list)
+  - initial-tab: :tree, :list, :issues, or :graph (default :tree)
   
   On first call: Creates frame, builds UI, shows window
   On subsequent calls: Returns existing frame (already visible)"
   ([]
-   (create-main-frame :list))
+   (create-main-frame :tree))
   ([initial-tab]
    (if @*frame
      @*frame ; Frame already exists
@@ -414,10 +422,13 @@
        ;; Create content
        (let [content (create-content)
              ;; Set initial tab BEFORE adding to frame
+             ;; Tab indices: 0=Tree View, 1=List View, 2=Issues, 3=Graph(PNG), 4=ASCII, 5=Clickable
              tab-index (case initial-tab
-                         :graph 1
-                         :list 0
-                         0)]
+                         :tree 0
+                         :list 1
+                         :issues 2
+                         :graph 3
+                         0)] ; Default to Tree View
          (.setSelectedIndex content tab-index)
          (.add (.getContentPane frame) content java.awt.BorderLayout/CENTER))
 
@@ -430,12 +441,14 @@
        ;; Show window
        (s/show! frame)
 
-       ;; Set initial focus to the issue list (not search bar)
-       ;; This allows j/k navigation to work immediately!
-       (when (= initial-tab :list)
-         (sf/invoke-later
-          (fn []
-            (.requestFocusInWindow (s/select frame [:#issue-list])))))
+       ;; Set initial focus based on tab
+       (sf/invoke-later
+        (fn []
+          (case initial-tab
+            :issues (.requestFocusInWindow (s/select frame [:#issue-list]))
+            :list (.requestFocusInWindow (s/select frame [:#list-view-listbox]))
+            :tree nil ; Tree view uses HTML, no focus needed
+            nil)))
 
        (log/info :create-main-frame :success true :target-dir target-dir :initial-tab initial-tab)
        frame))))
