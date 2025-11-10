@@ -44,7 +44,11 @@
                  (let [filtered-issues (db/get-filtered-issues)
                        display-items (mapv format-issue-item filtered-issues)]
                    (log/debug :update-list-view-listbox! :count (count filtered-issues))
-                   (s/config! listbox :model display-items)))))
+                   (s/config! listbox :model display-items)))
+
+               ;; Update tree view (closed issues should disappear)
+               (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
+                 (refresh-fn))))
 
   ;; Watch filter text - update list when filter changes
   (sf/watch! db/*app-state [:filter-text]
