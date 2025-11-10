@@ -211,7 +211,12 @@
   (let [selected-id (:selected-issue @db/*app-state)
         flat-issues-list (build-flat-issue-list issues deps)
         _ (swap! db/*app-state assoc :tree-flat-list flat-issues-list) ; Store for j/k nav
+
+        ;; Store current issues/deps in atoms for refresh functions
+        current-issues (atom issues)
+        current-deps (atom deps)
         flat-issues (atom flat-issues-list)
+
         html-tree (generate-html-tree issues deps selected-id)
 
         text-pane (doto (JTextPane.)
@@ -223,10 +228,16 @@
 
         scroll-pane (JScrollPane. text-pane)
 
-        refresh-fn (fn []
+        ;; FAST: Just update highlighting, no DB query!
+        highlight-fn (fn []
+                       (let [selected-id (:selected-issue @db/*app-state)]
+                         (refresh-tree-html! text-pane @current-issues @current-deps selected-id)))
+
+        ;; FULL: Rebuild tree with fresh data (called when issues/deps change)
+        rebuild-fn (fn []
                      (let [selected-id (:selected-issue @db/*app-state)
                            issues (:issues @db/*app-state)
-                           deps (beads-db/get-dependencies)
+                           deps (:dependencies @db/*app-state) ; Use cached deps!
                            open-issues (filter #(not= "closed" (:status %)) issues)
                            open-ids (set (map :id open-issues))
                            open-deps (filter (fn [{:keys [issue-id depends-on-id]}]
@@ -234,6 +245,8 @@
                                                     (open-ids depends-on-id)))
                                              deps)
                            new-flat-list (build-flat-issue-list open-issues open-deps)]
+                       (reset! current-issues open-issues)
+                       (reset! current-deps open-deps)
                        (reset! flat-issues new-flat-list)
                        (swap! db/*app-state assoc :tree-flat-list new-flat-list) ; Update for j/k nav
                        (refresh-tree-html! text-pane open-issues open-deps selected-id)))]
@@ -245,14 +258,15 @@
 
     {:component scroll-pane
      :text-pane text-pane
-     :refresh-fn refresh-fn
+     :highlight-fn highlight-fn ; Fast: just highlighting
+     :rebuild-fn rebuild-fn ; Slow: full rebuild
      :flat-issues flat-issues}))
 
 (defn create-tree-view
   "Create the tree view component for the main UI."
   []
   (let [issues (:issues @db/*app-state)
-        deps (beads-db/get-dependencies)
+        deps (:dependencies @db/*app-state) ; Use cached deps!
         open-issues (filter #(not= "closed" (:status %)) issues)
         open-ids (set (map :id open-issues))
         open-deps (filter (fn [{:keys [issue-id depends-on-id]}]
@@ -261,7 +275,9 @@
                           deps)
         tree-panel (create-tree-panel open-issues open-deps)]
 
-    (swap! db/*app-state assoc-in [:ui-refs :tree-refresh-fn] (:refresh-fn tree-panel))
+    ;; Store both refresh functions in ui-refs
+    (swap! db/*app-state assoc-in [:ui-refs :tree-highlight-fn] (:highlight-fn tree-panel))
+    (swap! db/*app-state assoc-in [:ui-refs :tree-rebuild-fn] (:rebuild-fn tree-panel))
     (swap! db/*app-state assoc-in [:ui-refs :tree-flat-issues] (:flat-issues tree-panel))
     (swap! db/*app-state assoc-in [:ui-refs :tree-text-pane] (:text-pane tree-panel))
 

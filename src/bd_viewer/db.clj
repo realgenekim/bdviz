@@ -33,6 +33,7 @@
 
 (defonce *app-state
   (atom {:issues [] ; Vector of ClosedRecord issues
+         :dependencies [] ; Cached dependencies from DB (avoid repeated queries)
          :selected-issue nil ; Currently selected issue ID (string)
          :selected-index -1 ; Index in filtered list for j/k navigation
          :filter-text "" ; Search filter text
@@ -72,19 +73,27 @@
 ;; ============================================================================
 
 (defn init-state!
-  "Load issues from bd CLI and reset state.
+  "Load issues and dependencies from bd CLI and reset state.
   Call this on startup and when reloading config."
   []
   (log/info :init-state! :start true)
-  (let [issues (load-issues-from-bd)]
+  (let [issues (load-issues-from-bd)
+        deps (try
+               (require 'bd-viewer.beads.sqlite)
+               ((resolve 'bd-viewer.beads.sqlite/get-dependencies))
+               (catch Exception e
+                 (log/warn :init-state! :deps-load-failed (.getMessage e))
+                 []))]
     (swap! *app-state assoc
            :issues issues
+           :dependencies deps
            :selected-issue nil
            :selected-index -1
            :filter-text "")
     (log/info :init-state!
               :success true
-              :issue-count (count issues))
+              :issue-count (count issues)
+              :dep-count (count deps))
     issues))
 
 ;; ============================================================================

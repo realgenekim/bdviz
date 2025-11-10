@@ -5,6 +5,7 @@
   (:require [swing-fx.core :as sf]
             [seesaw.core :as s]
             [bd-viewer.db :as db]
+            [bd-viewer.utils.time :as time-utils]
             [taoensso.timbre :as log])
   (:import [javax.swing DefaultListModel JList JLabel JTextArea Timer]
            [java.awt Color Font]))
@@ -46,9 +47,9 @@
                    (log/debug :update-list-view-listbox! :count (count filtered-issues))
                    (s/config! listbox :model display-items)))
 
-               ;; Update tree view (closed issues should disappear)
-               (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
-                 (refresh-fn))))
+;; FULL REBUILD: Tree needs to rebuild when issues change
+               (when-let [rebuild-fn (get-in @db/*app-state [:ui-refs :tree-rebuild-fn])]
+                 (rebuild-fn))))
 
   ;; Watch filter text - update list when filter changes
   (sf/watch! db/*app-state [:filter-text]
@@ -89,9 +90,9 @@
                        display-items (mapv format-issue-item filtered-issues)]
                    (s/config! listbox :model display-items)))
 
-               ;; Update tree view
-               (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
-                 (refresh-fn))))
+;; FULL REBUILD: Tree needs to rebuild when show-open-only changes
+               (when-let [rebuild-fn (get-in @db/*app-state [:ui-refs :tree-rebuild-fn])]
+                 (rebuild-fn))))
 
   ;; Watch selected index - update JList selection
   (sf/watch! db/*app-state [:selected-index]
@@ -113,7 +114,7 @@
                      (.ensureIndexIsVisible listbox new))
                    (.clearSelection listbox)))))
 
-  ;; Watch selected issue - update detail panels and tree highlighting
+;; Watch selected issue - update detail panels and tree highlighting
   (sf/watch! db/*app-state [:selected-issue]
              (fn [old new]
                (let [issue (when new (db/get-issue-by-id new))]
@@ -161,11 +162,11 @@
 
                                (when-let [created-label (s/select frame [(keyword (str prefix "created-label"))])]
                                  (s/config! created-label
-                                            :text (str "Created: " (:created-at issue))))
+                                            :text (str "Created: " (time-utils/format-timestamp (:created-at issue)))))
 
                                (when-let [updated-label (s/select frame [(keyword (str prefix "updated-label"))])]
                                  (s/config! updated-label
-                                            :text (str "Updated: " (:updated-at issue)))))
+                                            :text (str "Updated: " (time-utils/format-timestamp (:updated-at issue))))))
 
                              ;; No issue selected - clear everything
                              (do
@@ -193,9 +194,9 @@
                    (update-detail-panel! "#tree-")
                    (update-detail-panel! "#list-")
 
-                   ;; Refresh tree view to highlight selected issue
-                   (when-let [refresh-fn (get-in @db/*app-state [:ui-refs :tree-refresh-fn])]
-                     (refresh-fn))))))
+                   ;; FAST: Just update tree highlighting (no DB query!)
+                   (when-let [highlight-fn (get-in @db/*app-state [:ui-refs :tree-highlight-fn])]
+                     (highlight-fn))))))
 
   ;; IMPORTANT: Do initial population on EDT!
   ;; Watchers only fire on changes, so we need to manually populate initially

@@ -96,10 +96,18 @@
   (log/info ::reload-issues :start true)
   (try
     (let [issues (db/load-issues-from-bd)
+          deps (try
+                 (require 'bd-viewer.beads.sqlite)
+                 ((resolve 'bd-viewer.beads.sqlite/get-dependencies))
+                 (catch Exception e
+                   (log/warn ::reload-issues :deps-load-failed (.getMessage e))
+                   []))
           current-selected (:selected-issue @db/*app-state)
           ;; Check if currently selected issue still exists
           still-exists? (some #(= (:id %) current-selected) issues)]
-      (swap! db/*app-state assoc :issues issues)
+      (swap! db/*app-state assoc
+             :issues issues
+             :dependencies deps) ; Update cached deps!
       ;; Clear selection if selected issue was deleted externally
       (when-not still-exists?
         (swap! db/*app-state assoc
@@ -112,7 +120,8 @@
 
       (log/info ::reload-issues
                 :success true
-                :count (count issues)))
+                :count (count issues)
+                :dep-count (count deps)))
     (catch Exception e
       (log/error ::reload-issues
                  :exception (.getMessage e))
@@ -320,11 +329,14 @@
     ;; Reload all namespaces with fresh code
     ;; IMPORTANT: Reload db FIRST, before events, so new functions are available
     (require 'bd-viewer.db :reload)
+    (require 'bd-viewer.utils.time :reload)
+    (require 'bd-viewer.state.derived :reload)
     (require 'bd-viewer.events :reload)
     (require 'bd-viewer.effects.swing :reload)
     (require 'bd-viewer.keyboard :reload)
     (require 'bd-viewer.mermaid :reload)
     (require 'bd-viewer.ui.graph-tab2 :reload)
+    (require 'bd-viewer.ui.tree-view :reload)
     (require 'bd-viewer.ui :reload)
 
     ;; Rebuild UI with fresh view functions
@@ -333,7 +345,35 @@
     ;; Also rebuild graph tab with fresh diagram
     ((resolve 'bd-viewer.ui/rebuild-graph-tab!))
 
-    (log/info ::reload-code :success true)
+;; FULL UI FRESH: Reload data too!
+    ;; This ensures all watchers fire with fresh data in the new UI
+    (let [issues (db/load-issues-from-bd)
+          deps (try
+                 ((resolve 'bd-viewer.beads.sqlite/get-dependencies))
+                 (catch Exception e
+                   (log/warn ::reload-code :deps-load-failed (.getMessage e))
+                   []))]
+      (swap! db/*app-state assoc
+             :issues issues
+             :dependencies deps) ; Update cached deps!
+      (log/info ::reload-code :issues-reloaded true :count (count issues) :dep-count (count deps)))
+
+    ;; Force detail panel refresh by re-triggering selected issue watcher
+    ;; This ensures new formatting code (like time-ago) is applied
+    (let [current-issue-id (:selected-issue @db/*app-state)
+          issues (:issues @db/*app-state)
+          still-exists? (some #(= (:id %) current-issue-id) issues)]
+      (when current-issue-id
+        (if still-exists?
+          (do
+            (swap! db/*app-state assoc :selected-issue nil) ; Clear
+            (swap! db/*app-state assoc :selected-issue current-issue-id)) ; Re-set to trigger watcher
+          ;; Issue was deleted externally, clear selection
+          (swap! db/*app-state assoc
+                 :selected-issue nil
+                 :selected-index -1))))
+
+    (log/info ::reload-code :success true :full-refresh true)
     (catch Exception e
       (log/error ::reload-code
                  :exception (.getMessage e)

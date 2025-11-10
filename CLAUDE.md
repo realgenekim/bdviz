@@ -112,6 +112,29 @@ This applies to ALL code in this project. See `swing-fx/src/swing_fx/core.clj` f
 
 ### Reload Features
 
-- **Reload Config** button: Refresh issue list from `bd list --json`
-- **Reload Code** button: Hot reload all namespaces (coming soon)
+- **Cmd+R (Reload Config)**: Refresh issue list from `bd list --json` + rebuild graph tabs
+- **Cmd+Shift+R (Full UI Fresh)**: Complete refresh - reload ALL code + data + rebuild entire UI
+  - Reloads all namespaces with fresh code
+  - Rebuilds entire UI from scratch with new view functions
+  - Reloads all data from `bd list --json`
+  - Rebuilds all graph tabs with fresh diagrams
+  - Triggers all watchers to repopulate UI with fresh data
+  - Validates selected issue still exists (clears if deleted externally)
+  - **Use this when you make code changes and want to see them immediately!**
 - State persists across hot reloads (using `defonce`)
+
+### Keyboard Shortcuts
+
+**Navigation:**
+- `j` - Next issue (context-aware: tree order in Tree View, numeric in other tabs)
+- `k` - Previous issue (context-aware: tree order in Tree View, numeric in other tabs)
+- `o` - Toggle open/all issues filter
+- `Escape` - Clear search filter
+
+**Actions:**
+- `c` - Close current issue (sets status to "closed")
+- `Cmd+D` - Delete current issue
+
+**Reload:**
+- `Cmd+R` - Reload data from `bd list --json`
+- `Cmd+Shift+R` - Full UI fresh (code + data + complete UI rebuild)

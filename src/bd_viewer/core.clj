@@ -4,6 +4,7 @@
             [bd-viewer.ui :as ui]
             [bd-viewer.effects.swing :as fx]
             [bd-viewer.keyboard :as kbd]
+            [bd-viewer.state.derived :as derived]
             [swing-fx.core :as sf]
             [taoensso.timbre :as log]
             [logging.main :as glog]
@@ -60,34 +61,40 @@
     ;; 1. Initialize state
     (db/init-state!)
 
-    ;; 2. Create and show UI with initial tab selection
+    ;; 2. Setup automatic derived state computation (BEFORE UI!)
+    ;; This ensures tree-flat-list is ALWAYS up to date with :issues and :show-open-only
+    ;; Makes it IMPOSSIBLE to forget to update derived state!
+    (derived/setup-derived-state-watcher! db/*app-state)
+    (log/info :derived-state-watcher :enabled true)
+
+    ;; 3. Create and show UI with initial tab selection
     (let [frame (ui/create-main-frame (:initial-tab opts))]
 
-      ;; 3. Setup global exception handler
+      ;; 4. Setup global exception handler
       (setup-exception-handler! frame)
 
-      ;; 4. Setup reactive watchers with swing-fx (after UI exists!)
+      ;; 5. Setup reactive watchers with swing-fx (after UI exists!)
       (fx/setup-watchers! frame)
 
-      ;; 5. Setup keyboard shortcuts (after UI exists!)
+      ;; 6. Setup keyboard shortcuts (after UI exists!)
       (kbd/setup-keyboard-shortcuts! frame)
 
-      ;; 6. Register keyboard shortcuts to reload automatically on Cmd+Shift+R
+      ;; 7. Register keyboard shortcuts to reload automatically on Cmd+Shift+R
       ;; IMPORTANT: Use resolve to get fresh function on each reload!
       ;; This hook will be called automatically by rebuild-ui! via sf/reload!
       (sf/register-reload-hook!
        (fn [frame]
          ((resolve 'bd-viewer.keyboard/setup-keyboard-shortcuts!) frame)))
 
-      ;; 7. Add state dump watcher for debugging
+      ;; 8. Add state dump watcher for debugging
       (add-watch db/*app-state ::dump-state
                  (fn [_ _ old-state new-state]
                    (dump-state-to-file!)))
 
-      ;; 8. Initial state dump
+      ;; 9. Initial state dump
       (dump-state-to-file!)
 
-      ;; 9. Select first issue if there are any issues
+      ;; 10. Select first issue if there are any issues
       ;; This will trigger watchers which will populate the UI
       (when (seq (:issues @db/*app-state))
         (db/select-issue-by-index 0))))
